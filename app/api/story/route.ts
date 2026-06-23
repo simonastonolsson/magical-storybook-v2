@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
     const result = await model.generateContent(
       `Write a short, cozy, and magical children's bedtime story in English based on this memory or idea: "${prompt}". Keep it uplifting, safe for all ages, and engaging.`

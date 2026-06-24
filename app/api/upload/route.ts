@@ -15,9 +15,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'No file body found' }, { status: 400 });
     }
 
-    // Detta laddar upp bilden till ditt nyskapade Vercel Blob-lager
+    // Vi sätter denna till public nu när din store är public!
     const blob = await put(filename, body, {
-      access: 'private',
+      access: 'public',
     });
 
     return NextResponse.json(blob);

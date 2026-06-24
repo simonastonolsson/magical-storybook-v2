@@ -4,15 +4,17 @@ import { useState, useRef } from 'react';
 
 export default function Page() {
   const [memory, setMemory] = useState('');
-  const [story, setStory] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [comic, setComic] = useState<any>(null);
+  const [isLoadingScript, setIsLoadingScript] = useState(false);
   
-  // Bild-states
   const [imageUrl, setImageUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hantera uppladdning till Vercel Blob
+  // Nya states för att hålla koll på de genererade AI-bilderna!
+  const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
     
@@ -25,12 +27,10 @@ export default function Page() {
         body: file,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to upload image.');
-      }
+      if (!response.ok) throw new Error('Failed to upload image.');
 
       const newBlob = await response.json();
-      setImageUrl(newBlob.url); // Här sparar vi länken till den uppladdade bilden!
+      setImageUrl(newBlob.url);
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Could not upload your image, please try again.');
@@ -39,121 +39,136 @@ export default function Page() {
     }
   };
 
+  // Denna funktion går igenom alla paneler och ber servern rita bilder!
+  const generateImagesForComic = async (comicData: any, uploadedImageUrl: string) => {
+    setIsGeneratingImages(true);
+    
+    for (const panel of comicData.panels) {
+      try {
+        const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: panel.image_prompt, imageUrl: uploadedImageUrl }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          // När bilden är klar, spara den så den poppar upp i rätt ruta!
+          setGeneratedImages(prev => ({...prev, [panel.panel_number]: data.imageUrl}));
+        }
+      } catch (err) {
+        console.error(`Failed to generate image for panel ${panel.panel_number}`, err);
+      }
+    }
+    setIsGeneratingImages(false);
+  };
+
   const handleCreateStory = async () => {
     if (!memory.trim()) {
       alert("Please describe a memory or an idea first!");
       return;
     }
-    setIsLoading(true);
-    setStory('');
+    setIsLoadingScript(true);
+    setComic(null);
+    setGeneratedImages({}); // Rensa gamla bilder
 
     try {
       const response = await fetch('/api/story', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: memory,
-          characterImageUrl: imageUrl // Vi skickar med bildlänken till vårt API här!
-        }),
+        body: JSON.stringify({ prompt: memory, characterImageUrl: imageUrl }),
       });
 
-      if (!response.ok) {
-        throw new Error('Something went wrong on the server.');
-      }
+      if (!response.ok) throw new Error('Something went wrong on the server.');
 
       const data = await response.json();
-      setStory(data.story);
+      setComic(data.comic);
+      
+      // När textmanuset är klart, starta bildgenereringen direkt!
+      generateImagesForComic(data.comic, imageUrl);
 
     } catch (error) {
       console.error("Failed to generate story:", error);
       alert("Sorry, the magic failed this time. Please try again.");
     } finally {
-      setIsLoading(false);
+      setIsLoadingScript(false);
     }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50">
-      {/* Main Headline Section */}
-      <div className="mb-12">
+    <main className="flex min-h-screen flex-col items-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50 font-sans">
+      <div className="mb-12 max-w-3xl mt-10">
         <h1 className="text-5xl font-bold text-gray-800">
-          Turn any idea into a <span className="text-purple-500">magical storybook</span>
+          Turn any idea into a <span className="text-purple-500">comic book</span>
         </h1>
         <p className="mt-4 text-lg text-gray-600">
-          Story Nest helps you write and illustrate personalized books using your children's own photos.
+          Upload a photo, write an idea, and let AI direct your personal comic.
         </p>
       </div>
 
       <div className="w-full max-w-2xl space-y-6">
-        {/* Step A: Upload Child's Photo */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
-          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Upload a photo of the main character</h3>
-          <p className="text-sm text-gray-600 mb-4">This photo will be used to keep the character consistent across the book.</p>
-          
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            className="hidden" 
-            accept="image/*"
-          />
-
+          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Upload main character</h3>
+          <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*" />
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50"
-            >
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
               {isUploading ? 'Uploading...' : 'Choose Photo'}
             </button>
-
             {imageUrl && (
               <div className="flex items-center gap-2">
-                <span className="text-green-600 font-bold">✓ Uploaded successfully!</span>
+                <span className="text-green-600 font-bold">✓ Ready!</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
-                  src={imageUrl} 
-                  alt="Uploaded preview" 
-                  className="w-12 h-12 rounded-full object-cover border-2 border-purple-300"
-                />
+                <img src={imageUrl} alt="Uploaded preview" className="w-12 h-12 rounded-full object-cover border-2 border-purple-300" />
               </div>
             )}
           </div>
         </div>
 
-        {/* Step B: Describe the story */}
-        <div className="relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur">
-          <div className="pointer-events-none absolute -top-5 -left-3 text-4xl">🌟</div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2 text-left">📝 Step 2: Describe your idea or memory</h3>
-          <textarea
-            id="memory"
-            name="memory"
-            rows={5}
-            className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800"
-            placeholder="For example: The day we built a fort in the woods..."
-            value={memory}
-            onChange={(e) => setMemory(e.target.value)}
-            disabled={isLoading}
-          />
+        <div className="relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
+          <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
+          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. A space journey to find the missing chocolate chip cookie..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript} />
         </div>
 
-        {/* Magic Submit Button */}
-        <button
-          type="button"
-          onClick={handleCreateStory}
-          disabled={isLoading || isUploading}
-          className="group mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 px-8 py-4 text-xl font-bold text-white transition-transform duration-300 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 shadow-md"
-        >
-          {isLoading ? 'Creating magic...' : ( <> <span className="transition group-hover:rotate-12">🪄</span> Create my magical story </> )}
+        <button type="button" onClick={handleCreateStory} disabled={isLoadingScript} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-xl font-bold text-white hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100">
+          {isLoadingScript ? 'Directing comic script...' : '🪄 Generate Comic Book'}
         </button>
       </div>
 
-      {/* Story Result Section */}
-      {story && (
-        <div className="mt-12 w-full max-w-2xl rounded-xl bg-white/80 p-8 shadow-lg text-left">
-          <h2 className="text-2xl font-bold text-gray-800">Your Magical Story:</h2>
-          <p className="mt-4 whitespace-pre-wrap text-lg text-gray-700 leading-relaxed">{story}</p>
+      {comic && (
+        <div className="mt-16 w-full max-w-5xl">
+          <h2 className="text-4xl font-black text-gray-800 mb-8 uppercase tracking-wide">{comic.title}</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {comic.panels.map((panel: any) => (
+              <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
+                
+                {/* Image Placeholder eller Genererad Bild */}
+                <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
+                  {generatedImages[panel.panel_number] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="p-4 flex flex-col items-center justify-center text-center">
+                      <span className="text-gray-400 text-5xl mb-2">{isGeneratingImages ? '⏳' : '🖼️'}</span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        {isGeneratingImages ? 'AI is drawing this scene...' : 'Waiting for script...'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 bg-yellow-400 text-black font-black w-8 h-8 flex items-center justify-center rounded-full border-2 border-black z-10">
+                    {panel.panel_number}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-yellow-50 min-h-[100px] flex items-center">
+                  <p className="text-gray-800 font-medium text-lg leading-relaxed">
+                    {panel.narration}
+                  </p>
+                </div>
+
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </main>

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const result = await model.generateContent(
-      `Write a short, cozy, and magical children's bedtime story in English based on this memory or idea: "${prompt}". Keep it uplifting, safe for all ages, and engaging.`
+`Write a short, cozy, and magical children's bedtime story based on this memory or idea: "${prompt}". IMPORTANT: You must write the story in the exact same language that the prompt is written in (e.g., if the prompt is in Swedish, write the story in Swedish). Keep it uplifting, safe for all ages, and engaging.`
     );
 
     const text = result.response.text();

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Hjälpfunktion för att ladda ner bilden och göra om den till det format som Gemini kräver
 async function fetchImageAsBase64(url: string) {
   const response = await fetch(url);
   const buffer = await response.arrayBuffer();
@@ -18,7 +19,10 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "API key is missing on server" }), { status: 500 });
+      return new Response(JSON.stringify({ error: "API key is missing on server" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
 
     const contents: any[] = [];
 
+    // Om användaren har laddat upp en bild, ladda ner den och skicka med till AI:n så den kan "se" barnet!
     if (characterImageUrl) {
       try {
         const imagePart = await fetchImageAsBase64(characterImageUrl);
@@ -40,6 +45,7 @@ export async function POST(req: Request) {
       }
     }
 
+    // Lägg till den textbaserade instruktionen
     contents.push(
       `You are an expert comic book director and storyteller. Based on the user's idea: "${prompt}".
       
@@ -69,21 +75,16 @@ export async function POST(req: Request) {
     // Vi packar upp JSON-datan från AI:n
     const comicData = JSON.parse(jsonText);
     
-    // Formatera datan snyggt så din framsida kan visa det som en läsbar lista tills vi bygger bild-rutorna!
-    let formattedStory = `📚 **${comicData.title}**\n\n`;
-    
-    comicData.panels.forEach((panel: any) => {
-      formattedStory += `--- **Panel ${panel.panel_number}** ---\n`;
-      formattedStory += `📖 **Berättelse:** ${panel.narration}\n`;
-      formattedStory += `🎨 **Bild-prompt (redo för Bild-AI):** ${panel.image_prompt}\n\n`;
-    });
-
-    return new Response(JSON.stringify({ story: formattedStory }), {
+    // Skicka tillbaka den rena datan till framsidan!
+    return new Response(JSON.stringify({ comic: comicData }), {
       headers: { "Content-Type": "application/json" },
     });
 
   } catch (error) {
     console.error("Error generating story:", error);
-    return new Response(JSON.stringify({ error: "Failed to generate story" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Failed to generate story" }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

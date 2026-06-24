@@ -17,7 +17,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Detta laddar upp bilden till ditt nyskapade Vercel Blob-lager
     const blob = await put(filename, body, {
-      access: 'public',
+      access: 'private',
     });
 
     return NextResponse.json(blob);

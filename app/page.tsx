@@ -39,12 +39,22 @@ export default function Page() {
     }
   };
 
-  // KÖ-SYSTEM: Denna funktion väntar nu på att bild 1 är klar innan den startar bild 2!
+  // En liten hjälpfunktion för att pausa koden i X antal millisekunder
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // KÖ-SYSTEM MED PAUS: Väntar på bildgenerering + lägger till en säkerhetspaus på 10 sekunder!
   const generateImagesForComic = async (comicData: any, uploadedImageUrl: string) => {
     setIsGeneratingImages(true);
     
-    for (const panel of comicData.panels) {
+    for (let i = 0; i < comicData.panels.length; i++) {
+      const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
+
+      // Om det inte är första bilden, vänta i 10 sekunder först så att Replicate hinner nollställa vår rate limit!
+      if (i > 0) {
+        await delay(10000); 
+      }
+
       try {
         const response = await fetch('/api/generate-image', {
           method: 'POST',
@@ -55,6 +65,8 @@ export default function Page() {
         if (response.ok) {
           const data = await response.json();
           setGeneratedImages(prev => ({...prev, [panel.panel_number]: data.imageUrl}));
+        } else {
+          console.error(`Failed to generate panel ${panel.panel_number}:`, response.statusText);
         }
       } catch (err) {
         console.error(`Failed to generate image for panel ${panel.panel_number}`, err);

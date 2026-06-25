@@ -11,9 +11,9 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Nya states för att hålla koll på de genererade AI-bilderna!
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
@@ -39,11 +39,12 @@ export default function Page() {
     }
   };
 
-  // Denna funktion går igenom alla paneler och ber servern rita bilder!
+  // KÖ-SYSTEM: Denna funktion väntar nu på att bild 1 är klar innan den startar bild 2!
   const generateImagesForComic = async (comicData: any, uploadedImageUrl: string) => {
     setIsGeneratingImages(true);
     
     for (const panel of comicData.panels) {
+      setCurrentlyGeneratingPanel(panel.panel_number);
       try {
         const response = await fetch('/api/generate-image', {
           method: 'POST',
@@ -53,12 +54,12 @@ export default function Page() {
         
         if (response.ok) {
           const data = await response.json();
-          // När bilden är klar, spara den så den poppar upp i rätt ruta!
           setGeneratedImages(prev => ({...prev, [panel.panel_number]: data.imageUrl}));
         }
       } catch (err) {
         console.error(`Failed to generate image for panel ${panel.panel_number}`, err);
       }
+      setCurrentlyGeneratingPanel(null);
     }
     setIsGeneratingImages(false);
   };
@@ -70,7 +71,7 @@ export default function Page() {
     }
     setIsLoadingScript(true);
     setComic(null);
-    setGeneratedImages({}); // Rensa gamla bilder
+    setGeneratedImages({});
 
     try {
       const response = await fetch('/api/story', {
@@ -84,7 +85,7 @@ export default function Page() {
       const data = await response.json();
       setComic(data.comic);
       
-      // När textmanuset är klart, starta bildgenereringen direkt!
+      // Starta den smarta kön
       generateImagesForComic(data.comic, imageUrl);
 
     } catch (error) {
@@ -142,16 +143,19 @@ export default function Page() {
             {comic.panels.map((panel: any) => (
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
                 
-                {/* Image Placeholder eller Genererad Bild */}
                 <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="p-4 flex flex-col items-center justify-center text-center">
-                      <span className="text-gray-400 text-5xl mb-2">{isGeneratingImages ? '⏳' : '🖼️'}</span>
+                      <span className="text-gray-400 text-5xl mb-2">
+                        {currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}
+                      </span>
                       <span className="text-xs text-gray-500 font-mono">
-                        {isGeneratingImages ? 'AI is drawing this scene...' : 'Waiting for script...'}
+                        {currentlyGeneratingPanel === panel.panel_number 
+                          ? 'AI is drawing this scene right now...' 
+                          : 'In queue...'}
                       </span>
                     </div>
                   )}

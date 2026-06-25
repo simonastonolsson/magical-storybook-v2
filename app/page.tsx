@@ -52,7 +52,7 @@ export default function Page() {
 
       // Om det inte är första bilden, vänta i 10 sekunder först så att Replicate hinner nollställa vår rate limit!
       if (i > 0) {
-        await delay(10000); 
+        await delay(15000); 
       }
 
       try {

@@ -13,17 +13,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Trained model ID is missing!' }, { status: 400 });
     }
 
-    // SLUTGILTIG MAGI: Max-optimerade inställningar för konsekventa ansikten!
+    // trainedModelId är i formatet: "simonastonolsson/comic-hero-xxxxxx"
+    const [owner, name] = trainedModelId.split('/');
+
+    console.log(`Hämtar senaste versionen för modell: ${owner}/${name}...`);
+    
+    // 1. Vi frågar Replicate efter modellen för att hitta dess absolut senaste version!
+    const model = await replicate.models.get(owner, name);
+    const latestVersion = model.latest_version?.id;
+
+    if (!latestVersion) {
+      throw new Error(`Kunde inte hitta någon färdigtränad version för modellen ${trainedModelId}`);
+    }
+
+    const fullModelPath = `${trainedModelId}:${latestVersion}` as `${string}/${string}:${string}`;
+    console.log(`Anropar bildgenerering med fullständig path: ${fullModelPath}`);
+
+    // 2. Vi kör bildgenereringen med den exakta versionen!
     const output = await replicate.run(
-      trainedModelId as `${string}/${string}`, 
+      fullModelPath, 
       {
         input: {
           prompt: prompt,
           width: 1024,
           height: 768,
-          num_inference_steps: 28, // Flux Dev kräver 28 steg för att rita detaljer som flaggor rätt!
-          guidance_scale: 3.5,     // Standard för Flux Dev
-          lora_scale: 1.15         // Pressar upp likheten på ditt tränade ansikte (Standard är 1.0)
+          num_inference_steps: 28, 
+          guidance_scale: 3.5,     
+          lora_scale: 1.15         
         }
       }
     );

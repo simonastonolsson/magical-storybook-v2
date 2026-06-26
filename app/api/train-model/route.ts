@@ -13,19 +13,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing zip URL' }, { status: 400 });
     }
 
-    // Startar träningsjobbet i bakgrunden med branschstandard-tränaren ostris/flux-dev-lora-trainer
-    const prediction = await replicate.predictions.create({
-      version: "b6b801a613271fcdbb3111fdbbcfa4c90e0b5dd1341a9d4ea8638fb01c0cf9ef", 
-      input: {
-        input_images: zipUrl,
-        trigger_word: "TOK", // Det magiska ordet vi använder i våra prompter sedan!
-        steps: 1000,
-        resolution: "512,768,1024",
-      }
-    });
+    // BYT UT DETTA MOT DITT ANVÄNDARNAMN PÅ REPLICATE! (t.ex. 'simonastonolsson')
+    const replicateUsername = 'DITT_REPLICATE_ANVÄNDARNAMN'; 
+    const modelName = 'my-custom-lora-model';
+    const destinationModel = `${replicateUsername}/${modelName}` as `${string}/${string}`;
 
-    // Vi returnerar ID:t för träningen så framsidan kan fråga "är den klar än?"
-    return NextResponse.json({ trainingId: prediction.id });
+    // Vi startar träningen med Replicates officiella trainings-metod!
+    const training = await replicate.trainings.create(
+      "ostris",
+      "flux-dev-lora-trainer",
+      "e440909d3512c31646ee2e0c7d6f6f4923224863a6a10c494606e79fb5844497", // Ostris Flux Dev Trainer version
+      {
+        destination: destinationModel, // Här sparas din unika modell på ditt konto!
+        input: {
+          input_images: zipUrl,
+          trigger_word: "TOK",         // Ordet vi använder i sagan för att rita dig!
+          steps: 1000,
+        },
+      }
+    );
+
+    // Vi skickar tillbaka ID:t för själva tränings-jobbet
+    return NextResponse.json({ trainingId: training.id });
+    
   } catch (error) {
     console.error('Training start error:', error);
     return NextResponse.json({ error: 'Failed to start training' }, { status: 500 });

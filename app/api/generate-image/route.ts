@@ -24,23 +24,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ imageUrl: output[0] });
     }
 
-    // MAGIN: Vi anropar ByteDance's Flux PuLID-modell som klonar ansiktet!
+    // MAGIN: Vi anropar ByteDance's Flux PuLID-modell med det stabila versions-ID:t!
     const output = await replicate.run(
-      "bytedance/flux-pulid:8194ba1e3d92c00db8f11deee0cc7e21cbc948ea96efaf160cb7d4f738b556b6",
+      "bytedance/flux-pulid:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b",
       {
         input: {
           prompt: prompt,
           main_face_image: imageUrl, // Skickar med barnets uppladdade bild
-          id_weight: 0.85,           // Hur starkt ansiktet ska efterliknas (0.8 - 0.9 är perfekt)
-          num_steps: 20,             // Kvalitetssteg (20-25 ger tryckeri-kvalitet)
-          guidance_scale: 4,
-          width: 896,                // Hög upplösning anpassad för serietidningsformat
-          height: 1152,              // Stående format, perfekt för tryckeri
+          start_step: 4,             // Standardinställning för hur tidigt ansiktet ska infogas
+          num_outputs: 1,
+          negative_prompt: "bad quality, worst quality, text, signature, watermark, extra limbs"
         }
       }
     ) as string[];
 
-    return NextResponse.json({ imageUrl: output[0] });
+    // Denna modell returnerar ibland en lista av objekt istället för rena textsträngar.
+    // Vi säkerställer att vi plockar ut rätt bild-URL:
+    const finalImageUrl = typeof output[0] === 'object' ? (output[0] as any).url() : output[0];
+
+    return NextResponse.json({ imageUrl: finalImageUrl });
 
   } catch (error) {
     console.error('Image generation error:', error);

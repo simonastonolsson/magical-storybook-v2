@@ -13,25 +13,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Trained model ID is missing!' }, { status: 400 });
     }
 
-    // trainedModelId är i formatet: "simonastonolsson/comic-hero-xxxxxx"
-    const [owner, name] = trainedModelId.split('/');
-
-    console.log(`Hämtar senaste versionen för modell: ${owner}/${name}...`);
+    // Eftersom hemsidan nu skickar med den fullständiga vägen (med versionen inbakad), 
+    // kan vi rita bilden omedelbart och säkert!
+    console.log(`Anropar bildgenerering för modell: ${trainedModelId}`);
     
-    // 1. Vi frågar Replicate efter modellen för att hitta dess absolut senaste version!
-    const model = await replicate.models.get(owner, name);
-    const latestVersion = model.latest_version?.id;
-
-    if (!latestVersion) {
-      throw new Error(`Kunde inte hitta någon färdigtränad version för modellen ${trainedModelId}`);
-    }
-
-    const fullModelPath = `${trainedModelId}:${latestVersion}` as `${string}/${string}:${string}`;
-    console.log(`Anropar bildgenerering med fullständig path: ${fullModelPath}`);
-
-    // 2. Vi kör bildgenereringen med den exakta versionen!
     const output = await replicate.run(
-      fullModelPath, 
+      trainedModelId as `${string}/${string}:${string}`, 
       {
         input: {
           prompt: prompt,

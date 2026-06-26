@@ -7,12 +7,13 @@ export async function POST(req: Request) {
     if (!apiKey) return new Response(JSON.stringify({ error: "API key missing" }), { status: 500 });
 
     const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // KORRIGERING: Vi byter till den stabila och universella modellen "gemini-pro".
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-pro", 
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    // KORRIGERING: Vi skapar en korrekt formaterad prompt.
     const fullPrompt = `You are an expert comic book director. The user's idea is: "${prompt}".
       First, identify the main character's name from the user's prompt.
       Then, create a comic script with 4-5 panels.
@@ -31,7 +32,6 @@ export async function POST(req: Request) {
         "panels": [{ "panel_number": 1, "narration": "Text with real name...", "image_prompt": "Image prompt with TOK..." }]
       }`;
 
-    // Vi skickar prompten inuti det korrekta "contents"-objektet.
     const result = await model.generateContent(fullPrompt);
     const comicData = JSON.parse(result.response.text());
 

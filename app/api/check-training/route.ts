@@ -14,13 +14,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Frågar Replicate hur det går med uppgiften
     const prediction = await replicate.predictions.get(trainingId);
     
-    // Status kan vara "starting", "processing", "succeeded" eller "failed"
+    // Vi lägger till "version" här så att framsidan kan spara den direkt!
     return NextResponse.json({ 
       status: prediction.status, 
-      output: prediction.output // När status är "succeeded" kommer output innehålla länkarna till din färdiga modell!
+      output: prediction.output,
+      version: prediction.version
     });
   } catch (error) {
     console.error('Check training error:', error);

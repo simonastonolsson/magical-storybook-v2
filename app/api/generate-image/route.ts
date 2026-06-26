@@ -13,20 +13,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Trained model ID is missing!' }, { status: 400 });
     }
 
-    // Eftersom hemsidan nu skickar med den fullständiga vägen (med versionen inbakad), 
-    // kan vi rita bilden omedelbart och säkert!
-    console.log(`Anropar bildgenerering för modell: ${trainedModelId}`);
-    
+    // IDIOTSÄKERHET: Vi säkerställer att triggerordet "TOK" ALLTID finns med i början av prompten!
+    let finalPrompt = prompt;
+    if (!finalPrompt.includes("TOK")) {
+        finalPrompt = `TOK person, ${prompt}`;
+    }
+    // Rensa upp ifall Gemini skrivit in förvirrande text som "a photo of TOK"
+    finalPrompt = finalPrompt.replace(/a photo of TOK/gi, "TOK person");
+
+    console.log(`Skapar bild med prompt: ${finalPrompt}`);
+
     const output = await replicate.run(
       trainedModelId as `${string}/${string}:${string}`, 
       {
         input: {
-          prompt: prompt,
+          prompt: finalPrompt,
           width: 1024,
           height: 768,
           num_inference_steps: 28, 
           guidance_scale: 3.5,     
-          lora_scale: 1.15         
+          lora_scale: 1.25 // Skruvat upp från 1.15 för att TVINGA fram maximal ansiktslikhet!
         }
       }
     );

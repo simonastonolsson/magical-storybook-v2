@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import JSZip from 'jszip'; // Det nya biblioteket vi lade till för att packa zip-filer!
+import JSZip from 'jszip'; // Biblioteket för att zippa filer!
 
 export default function Page() {
+  // Texter och serietidning
   const [memory, setMemory] = useState('');
   const [comic, setComic] = useState<any>(null);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
   
-  // Nya states för LoRA-träning
+  // Nya LoRA-states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState('');
@@ -16,74 +17,72 @@ export default function Page() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Bildgenererings-states
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
 
-  // 1. Hantera när användaren väljer flera bilder
+  // 1. Hantera när kunden väljer FLERA bilder
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) return;
-    setSelectedFiles(Array.from(event.target.files));
+    if (event.target.files) {
+      setSelectedFiles(Array.from(event.target.files));
+    }
   };
 
-  // 2. Koden som zippar bilderna, laddar upp, och startar träningen!
-  const startTraining = async () => {
+  // 2. KÖRA TRÄNINGEN (Zippa -> Ladda upp -> Träna)
+  const handleStartTraining = async () => {
     if (selectedFiles.length < 5) {
-      alert("Ladda upp minst 5 bilder för att få ett bra resultat!");
+      alert("Please select at least 5 images for the best AI results!");
       return;
     }
 
     setIsTraining(true);
     try {
-      setTrainingStatus('📦 Packar bilderna till en zip-fil...');
+      setTrainingStatus('📦 Packaging your images...');
+      
       const zip = new JSZip();
       selectedFiles.forEach((file, index) => {
-        zip.file(`image_${index}.jpg`, file);
+        zip.file(`image_${index}.${file.name.split('.').pop()}`, file);
       });
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-      setTrainingStatus('☁️ Laddar upp till servern...');
-      const uploadRes = await fetch(`/api/upload?filename=training_${Date.now()}.zip`, {
+      setTrainingStatus('☁️ Uploading to AI servers...');
+      const uploadRes = await fetch(`/api/upload?filename=training_data.zip`, {
         method: 'POST',
         body: zipBlob,
       });
-      if (!uploadRes.ok) throw new Error('Upload failed');
+      if (!uploadRes.ok) throw new Error('Failed to upload zip');
       const { url: zipUrl } = await uploadRes.json();
 
-      setTrainingStatus('🧠 Startar AI-träningen på Replicate...');
+      setTrainingStatus('🧠 Training your unique AI model... (This can take ~5-10 mins)');
       const trainRes = await fetch('/api/train-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ zipUrl }),
       });
-      if (!trainRes.ok) throw new Error('Training start failed');
+      if (!trainRes.ok) throw new Error('Failed to start training');
       const { trainingId } = await trainRes.json();
 
-      setTrainingStatus('⏳ AI:n lär sig ansiktet! Detta tar ca 10-15 minuter. Stäng inte fliken...');
-
-      // En loop som frågar servern var 15:e sekund om träningen är klar
-      const pollInterval = setInterval(async () => {
+      setTrainingStatus('⏳ AI is learning... Please leave this page open.');
+      const checkInterval = setInterval(async () => {
         const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
-          clearInterval(pollInterval);
-          // Replicate skickar tillbaka ID:t för din nya, färdiga modell
-          setTrainedModelId("trained_model_ready"); 
-          setTrainingStatus('✅ Träningen är klar! Din AI-karaktär är redo.');
+          clearInterval(checkInterval);
+          setTrainedModelId(checkData.output[0]); // Träningen är klar! Spara den nya modellens ID.
+          setTrainingStatus('✅ Training Complete! Your AI character is ready.');
           setIsTraining(false);
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-          clearInterval(pollInterval);
-          setTrainingStatus('❌ Träningen misslyckades. Kolla Replicate-loggarna.');
+          clearInterval(checkInterval);
+          setTrainingStatus('❌ Training failed. Please check the logs on Replicate.');
           setIsTraining(false);
-        } else {
-          setTrainingStatus(`⏳ Tränar... (Status på Replicate: ${checkData.status})`);
         }
       }, 15000);
 
     } catch (error) {
       console.error(error);
-      setTrainingStatus('❌ Något gick fel.');
+      setTrainingStatus('❌ An error occurred during training.');
       setIsTraining(false);
     }
   };
@@ -96,14 +95,16 @@ export default function Page() {
       const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
 
-      if (i > 0) await delay(15000); 
+      if (i > 0) await delay(10000); // 10 sekunders paus
 
       try {
         const response = await fetch('/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          // Just nu skickar vi tomt på imageUrl eftersom vi ska bygga om backend att använda din NYA modell istället
-          body: JSON.stringify({ prompt: panel.image_prompt, imageUrl: "" }), 
+          body: JSON.stringify({ 
+            prompt: panel.image_prompt, 
+            trainedModelId: trainedModelId // Skicka med ID:t för din tränade modell!
+          }),
         });
         
         if (response.ok) {
@@ -155,22 +156,21 @@ export default function Page() {
           Turn any idea into a <span className="text-purple-500">comic book</span>
         </h1>
         <p className="mt-4 text-lg text-gray-600">
-          Step 1: Train the AI on your face. Step 2: Write a story!
+          Step 1: Train the AI on your character. Step 2: Write a story!
         </p>
       </div>
 
       <div className="w-full max-w-2xl space-y-6">
         
-        {/* NYA STEG 1: Ladda upp OCH TRÄNA */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
           <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train AI Character (Upload 5-15 photos)</h3>
           
-          {/* MULTIPLE är tillagt här! */}
+          {/* KORRIGERING: onChange anropar nu rätt funktion: handleFileSelection */}
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
           
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isTraining} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
                 Choose Photos
               </button>
               {selectedFiles.length > 0 && (
@@ -179,7 +179,7 @@ export default function Page() {
             </div>
 
             {selectedFiles.length >= 5 && !trainedModelId && (
-              <button onClick={startTraining} disabled={isTraining} className="mt-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition disabled:opacity-50">
+              <button onClick={handleStartTraining} disabled={isTraining} className="mt-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition disabled:opacity-50">
                 {isTraining ? 'Training in progress...' : '🚀 Start AI Training'}
               </button>
             )}
@@ -192,8 +192,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* STEG 2: Berättelsen (Visas bara om träningen är klar, eller om man vill testa direkt) */}
-        <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left ${!trainedModelId ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
           <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. A space journey to find the missing chocolate chip cookie..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
         </div>
@@ -211,7 +210,6 @@ export default function Page() {
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
                 <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="p-4 flex flex-col items-center justify-center text-center">

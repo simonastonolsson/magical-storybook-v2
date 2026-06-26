@@ -13,26 +13,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Trained model ID is missing!' }, { status: 400 });
     }
 
-    // IDIOTSÄKERHET: Vi säkerställer att triggerordet "TOK" ALLTID finns med i början av prompten!
-    let finalPrompt = prompt;
-    if (!finalPrompt.includes("TOK")) {
-        finalPrompt = `TOK person, ${prompt}`;
-    }
-    // Rensa upp ifall Gemini skrivit in förvirrande text som "a photo of TOK"
-    finalPrompt = finalPrompt.replace(/a photo of TOK/gi, "TOK person");
-
-    console.log(`Skapar bild med prompt: ${finalPrompt}`);
+    // Vi skickar prompten precis som den är (utan att klistra in TOK i början av meningen).
+    // Detta förhindrar helt att AI:n blandar ihop ditt ansikte med djuren (pingvinerna) i scenen!
+    console.log(`Skapar bild med ren prompt: ${prompt}`);
 
     const output = await replicate.run(
       trainedModelId as `${string}/${string}:${string}`, 
       {
         input: {
-          prompt: finalPrompt,
+          prompt: prompt,
           width: 1024,
           height: 768,
           num_inference_steps: 28, 
-          guidance_scale: 3.5,     
-          lora_scale: 1.25 // Skruvat upp från 1.15 för att TVINGA fram maximal ansiktslikhet!
+          guidance_scale: 3.5,     // Standard för mjuka, naturliga och vackra bilder
+          lora_scale: 0.85         // Sänkt till 0.85! Detta gör att du ser ung, mjuk och naturlig ut igen.
         }
       }
     );

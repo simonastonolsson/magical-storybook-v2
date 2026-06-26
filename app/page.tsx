@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useRef } from 'react';
-import JSZip from 'jszip'; // Biblioteket för att zippa filer!
+import { useState, useRef, useEffect } from 'react';
+import JSZip from 'jszip';
 
 export default function Page() {
-  // Texter och serietidning
   const [memory, setMemory] = useState('');
   const [comic, setComic] = useState<any>(null);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
   
-  // Nya LoRA-states
+  // LoRA-states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState('');
@@ -17,36 +16,41 @@ export default function Page() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Bildgenererings-states
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
 
-  // 1. Hantera när kunden väljer FLERA bilder
+  // NYTT: Kolla om det redan finns en sparad AI-modell i webbläsaren när sidan öppnas!
+  useEffect(() => {
+    const savedModel = localStorage.getItem('my_saved_lora_model');
+    if (savedModel) {
+      setTrainedModelId(savedModel);
+      setTrainingStatus(`🎉 Hittade din sparade AI-modell! Redo att skapa berättelser.`);
+    }
+  }, []);
+
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setSelectedFiles(Array.from(event.target.files));
     }
   };
 
-  // 2. KÖRA TRÄNINGEN (Zippa -> Ladda upp -> Träna)
   const handleStartTraining = async () => {
     if (selectedFiles.length < 5) {
-      alert("Please select at least 5 images for the best AI results!");
+      alert("Ladda upp minst 5 bilder för bästa AI-resultat!");
       return;
     }
 
     setIsTraining(true);
     try {
-      setTrainingStatus('📦 Packaging your images...');
-      
+      setTrainingStatus('📦 Packar bilderna till en zip-fil...');
       const zip = new JSZip();
       selectedFiles.forEach((file, index) => {
         zip.file(`image_${index}.${file.name.split('.').pop()}`, file);
       });
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-      setTrainingStatus('☁️ Uploading to AI servers...');
+      setTrainingStatus('☁️ Laddar upp till servern...');
       const uploadRes = await fetch(`/api/upload?filename=training_data.zip`, {
         method: 'POST',
         body: zipBlob,
@@ -54,7 +58,7 @@ export default function Page() {
       if (!uploadRes.ok) throw new Error('Failed to upload zip');
       const { url: zipUrl } = await uploadRes.json();
 
-      setTrainingStatus('🧠 Training your unique AI model... (This can take ~5-10 mins)');
+      setTrainingStatus('🧠 Tränar din unika AI-modell... (Detta tar ca 5-10 min)');
       const trainRes = await fetch('/api/train-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,26 +67,36 @@ export default function Page() {
       if (!trainRes.ok) throw new Error('Failed to start training');
       const { trainingId } = await trainRes.json();
 
-      setTrainingStatus('⏳ AI is learning... Please leave this page open.');
+      setTrainingStatus('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
+      
       const checkInterval = setInterval(async () => {
         const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
         const checkData = await checkRes.json();
 
         if (checkData.status === 'succeeded') {
           clearInterval(checkInterval);
-          setTrainedModelId(checkData.output[0]); // Träningen är klar! Spara den nya modellens ID.
-          setTrainingStatus('✅ Training Complete! Your AI character is ready.');
+          
+          // HÄR ÄR MAGIN: Vi bygger ihop destinations-länken till din nya personliga modell på Replicate!
+          const userModelPath = `simonastonolsson/comic-hero-${trainingId.split('-').pop()}`; 
+          
+          // Spara i både state och webbläsarens lokala minne för alltid!
+          setTrainedModelId(userModelPath);
+          localStorage.setItem('my_saved_lora_model', userModelPath);
+          
+          setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
           setIsTraining(false);
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
           clearInterval(checkInterval);
-          setTrainingStatus('❌ Training failed. Please check the logs on Replicate.');
+          setTrainingStatus('❌ Träningen misslyckades. Försök igen med mer högupplösta bilder.');
           setIsTraining(false);
+        } else {
+          setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
         }
       }, 15000);
 
     } catch (error) {
       console.error(error);
-      setTrainingStatus('❌ An error occurred during training.');
+      setTrainingStatus('❌ Ett fel uppstod under träningen.');
       setIsTraining(false);
     }
   };
@@ -95,7 +109,7 @@ export default function Page() {
       const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
 
-      if (i > 0) await delay(10000); // 10 sekunders paus
+      if (i > 0) await delay(10000); // 10 sekunders paus mellan bilderna
 
       try {
         const response = await fetch('/api/generate-image', {
@@ -103,7 +117,7 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             prompt: panel.image_prompt, 
-            trainedModelId: trainedModelId // Skicka med ID:t för din tränade modell!
+            trainedModelId: trainedModelId // Skickar med din nyss tränade modell till bildgeneratorn!
           }),
         });
         
@@ -121,7 +135,7 @@ export default function Page() {
 
   const handleCreateStory = async () => {
     if (!memory.trim()) {
-      alert("Please describe an adventure!");
+      alert("Beskriv ett äventyr först!");
       return;
     }
     setIsLoadingScript(true);
@@ -143,7 +157,7 @@ export default function Page() {
 
     } catch (error) {
       console.error("Story error:", error);
-      alert("Sorry, the magic failed. Please try again.");
+      alert("Något gick snett med manuset, försök igen.");
     } finally {
       setIsLoadingScript(false);
     }
@@ -162,10 +176,9 @@ export default function Page() {
 
       <div className="w-full max-w-2xl space-y-6">
         
+        {/* STEG 1: Träna AI */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
           <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train AI Character (Upload 5-15 photos)</h3>
-          
-          {/* KORRIGERING: onChange anropar nu rätt funktion: handleFileSelection */}
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
           
           <div className="flex flex-col gap-4">
@@ -189,9 +202,17 @@ export default function Page() {
                 {trainingStatus}
               </div>
             )}
+            
+            {/* Möjlighet att rensa sparad AI-modell om man vill träna en ny */}
+            {trainedModelId && (
+              <button onClick={() => { localStorage.removeItem('my_saved_lora_model'); setTrainedModelId(null); setTrainingStatus(''); }} className="text-xs text-red-500 hover:underline text-left mt-1">
+                🗑️ Ta bort sparad AI och träna en ny karaktär
+              </button>
+            )}
           </div>
         </div>
 
+        {/* STEG 2: Berättelsen */}
         <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
           <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. A space journey to find the missing chocolate chip cookie..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
@@ -210,6 +231,7 @@ export default function Page() {
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
                 <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="p-4 flex flex-col items-center justify-center text-center">

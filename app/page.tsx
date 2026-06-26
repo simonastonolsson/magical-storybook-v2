@@ -8,7 +8,6 @@ export default function Page() {
   const [comic, setComic] = useState<any>(null);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
   
-  // LoRA-states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState('');
@@ -20,7 +19,6 @@ export default function Page() {
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
 
-  // NYTT: Kolla om det redan finns en sparad AI-modell i webbläsaren när sidan öppnas!
   useEffect(() => {
     const savedModel = localStorage.getItem('my_saved_lora_model');
     if (savedModel) {
@@ -76,12 +74,11 @@ export default function Page() {
         if (checkData.status === 'succeeded') {
           clearInterval(checkInterval);
           
-          // HÄR ÄR MAGIN: Vi bygger ihop destinations-länken till din nya personliga modell på Replicate!
-          const userModelPath = `simonastonolsson/comic-hero-${trainingId.split('-').pop()}`; 
+          // Vi plockar den exakta versionen som Replicate skapade!
+          const fullModelVersionPath = checkData.version || checkData.output;
           
-          // Spara i både state och webbläsarens lokala minne för alltid!
-          setTrainedModelId(userModelPath);
-          localStorage.setItem('my_saved_lora_model', userModelPath);
+          setTrainedModelId(fullModelVersionPath);
+          localStorage.setItem('my_saved_lora_model', fullModelVersionPath);
           
           setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
           setIsTraining(false);
@@ -109,7 +106,7 @@ export default function Page() {
       const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
 
-      if (i > 0) await delay(10000); // 10 sekunders paus mellan bilderna
+      if (i > 0) await delay(10000); 
 
       try {
         const response = await fetch('/api/generate-image', {
@@ -117,7 +114,7 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             prompt: panel.image_prompt, 
-            trainedModelId: trainedModelId // Skickar med din nyss tränade modell till bildgeneratorn!
+            trainedModelId: trainedModelId 
           }),
         });
         
@@ -176,7 +173,6 @@ export default function Page() {
 
       <div className="w-full max-w-2xl space-y-6">
         
-        {/* STEG 1: Träna AI */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
           <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train AI Character (Upload 5-15 photos)</h3>
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
@@ -203,7 +199,6 @@ export default function Page() {
               </div>
             )}
             
-            {/* Möjlighet att rensa sparad AI-modell om man vill träna en ny */}
             {trainedModelId && (
               <button onClick={() => { localStorage.removeItem('my_saved_lora_model'); setTrainedModelId(null); setTrainingStatus(''); }} className="text-xs text-red-500 hover:underline text-left mt-1">
                 🗑️ Ta bort sparad AI och träna en ny karaktär
@@ -212,7 +207,6 @@ export default function Page() {
           </div>
         </div>
 
-        {/* STEG 2: Berättelsen */}
         <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
           <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. A space journey to find the missing chocolate chip cookie..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />

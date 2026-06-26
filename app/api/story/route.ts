@@ -32,14 +32,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // NYA REGLER FÖR GEMINI: Tvinga fram olika kameravinklar och händelser!
+    // NYA REGLER FÖR KÄNSLOR: Gemini måste beskriva starka och varierande ansiktsuttryck!
     contents.push(
       `You are an expert comic book director. Based on the user's idea: "${prompt}".
       Create a comic script with exactly 4 to 5 panels.
       
       IMPORTANT RULES:
       1. "narration": Write story text in the EXACT SAME LANGUAGE as the user's prompt.
-      2. "image_prompt": Write in ENGLISH. CRITICAL: You MUST vary the camera angles! Use "wide shot", "full body shot", or "action shot". Do NOT just make close-up portraits. Describe the environment (e.g., a midsummer pole, nature) and what the character is doing (e.g., dancing, running).
+      2. "image_prompt": Write in ENGLISH. 
+         * CRITICAL: You MUST define a clear, strong facial expression for the character in every single panel based on the scene's mood!
+         * Use highly descriptive words for emotions, such as: "laughing with a big open-mouthed smile", "looking terrified with wide eyes", "screaming in anger", "looking deeply focused and determined", "smiling gently with sparkling eyes".
+         * Vary the camera angles (wide shot, medium shot, action shot) and describe the environment (e.g. dancing around a midsummer pole).
       3. If a photo is provided, analyze the character's appearance (hair, clothes, gender) and include it in every prompt. End all prompts with: "comic book illustration style, vibrant, highly detailed background".
       
       Return ONLY a JSON object:

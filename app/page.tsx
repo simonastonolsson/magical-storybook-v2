@@ -21,7 +21,8 @@ export default function Page() {
 
   useEffect(() => {
     const savedModel = localStorage.getItem('my_saved_lora_model');
-    if (savedModel) {
+    // Vi kollar så att den sparade modellen faktiskt innehåller ett "/" så vi vet att det är rätt format
+    if (savedModel && savedModel.includes('/')) {
       setTrainedModelId(savedModel);
       setTrainingStatus(`🎉 Hittade din sparade AI-modell! Redo att skapa berättelser.`);
     }
@@ -74,11 +75,11 @@ export default function Page() {
         if (checkData.status === 'succeeded') {
           clearInterval(checkInterval);
           
-          // Vi plockar den exakta versionen som Replicate skapade!
-          const fullModelVersionPath = checkData.version || checkData.output;
+          // Här hämtar vi den perfekt ihoppusslade vägen från vår uppdaterade server!
+          const perfectModelPath = checkData.fullPath;
           
-          setTrainedModelId(fullModelVersionPath);
-          localStorage.setItem('my_saved_lora_model', fullModelVersionPath);
+          setTrainedModelId(perfectModelPath);
+          localStorage.setItem('my_saved_lora_model', perfectModelPath);
           
           setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
           setIsTraining(false);

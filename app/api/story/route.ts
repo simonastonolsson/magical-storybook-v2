@@ -1,17 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-async function fetchImageAsBase64(url: string) {
-  const response = await fetch(url);
-  const buffer = await response.arrayBuffer();
-  const mimeType = response.headers.get("content-type") || "image/jpeg";
-  return {
-    inlineData: { data: Buffer.from(buffer).toString("base64"), mimeType },
-  };
-}
-
 export async function POST(req: Request) {
   try {
-    const { prompt, characterImageUrl } = await req.json();
+    const { prompt } = await req.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return new Response(JSON.stringify({ error: "API key missing" }), { status: 500 });
@@ -23,27 +14,17 @@ export async function POST(req: Request) {
     });
 
     const contents: any[] = [];
-    if (characterImageUrl) {
-      try {
-        const imagePart = await fetchImageAsBase64(characterImageUrl);
-        contents.push(imagePart);
-      } catch (err) {
-        console.error("Failed to fetch character image for Gemini:", err);
-      }
-    }
-
-    // NYA REGLER FÖR KÄNSLOR: Gemini måste beskriva starka och varierande ansiktsuttryck!
     contents.push(
       `You are an expert comic book director. Based on the user's idea: "${prompt}".
       Create a comic script with exactly 4 to 5 panels.
       
-      IMPORTANT RULES:
-      1. "narration": Write story text in the EXACT SAME LANGUAGE as the user's prompt.
+      CRITICAL RULES:
+      1. "narration": Write story text in the EXACT SAME LANGUAGE as the user's prompt (e.g. Swedish).
       2. "image_prompt": Write in ENGLISH. 
-         * CRITICAL: You MUST define a clear, strong facial expression for the character in every single panel based on the scene's mood!
-         * Use highly descriptive words for emotions, such as: "laughing with a big open-mouthed smile", "looking terrified with wide eyes", "screaming in anger", "looking deeply focused and determined", "smiling gently with sparkling eyes".
-         * Vary the camera angles (wide shot, medium shot, action shot) and describe the environment (e.g. dancing around a midsummer pole).
-      3. If a photo is provided, analyze the character's appearance (hair, clothes, gender) and include it in every prompt. End all prompts with: "comic book illustration style, vibrant, highly detailed background".
+         * YOU MUST use the exact trigger word "TOK" to refer to the main character in every single panel (e.g. "TOK smiling", "TOK dancing around a midsummer pole") to activate the AI face.
+         * Keep the character consistent: TOK should have the same hair color and clothing style in all panels.
+         * Vary the camera angles (wide shot, medium shot, action shot) and describe the environment in detail.
+         * End all prompts with: "comic book illustration style, vibrant, highly detailed background".
       
       Return ONLY a JSON object:
       {

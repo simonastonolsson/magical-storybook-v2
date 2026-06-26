@@ -8,9 +8,9 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // RÄTT MODELL: Tillbaka till gemini-1.5-flash som har fullt stöd för JSON!
+    // KORRIGERING: Tillbaka till gemini-2.5-flash som vi använde när det fungerade felfritt!
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash", 
+      model: "gemini-2.5-flash", 
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -32,7 +32,6 @@ export async function POST(req: Request) {
         "panels": [{ "panel_number": 1, "narration": "Text with real name...", "image_prompt": "Image prompt with TOK..." }]
       }`;
 
-    // RÄTT FORMATERING: Vi skickar in strängen direkt!
     const result = await model.generateContent(fullPrompt);
     const comicData = JSON.parse(result.response.text());
 

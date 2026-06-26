@@ -8,9 +8,9 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // KORRIGERING: Vi byter till den stabila och universella modellen "gemini-pro".
+    // RÄTT MODELL: Tillbaka till gemini-1.5-flash som har fullt stöd för JSON!
     const model = genAI.getGenerativeModel({
-      model: "gemini-pro", 
+      model: "gemini-1.5-flash", 
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -21,8 +21,8 @@ export async function POST(req: Request) {
       CRITICAL RULES:
       1. "title" & "narration": Use the character's REAL NAME (e.g., "Simon", "Lovisa"). Write the narration in the SAME LANGUAGE as the user's prompt (e.g., Swedish).
       2. "image_prompt": Write in ENGLISH.
-         - You MUST use the special trigger word "a photo of TOK" to refer to the main character. NEVER use the real name in the image prompt.
-         - Example: "A full body shot of a photo of TOK wearing a spacesuit, walking on the moon".
+         - You MUST use the special trigger word "TOK" to refer to the main character. NEVER use the real name in the image prompt.
+         - Example: "A full body shot of TOK wearing a spacesuit, walking on the moon".
          - Describe the action and environment. Use varied camera angles (wide shot, action shot).
          - All image prompts must end with: ", comic book art, vibrant colors, detailed illustration".
 
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
         "panels": [{ "panel_number": 1, "narration": "Text with real name...", "image_prompt": "Image prompt with TOK..." }]
       }`;
 
+    // RÄTT FORMATERING: Vi skickar in strängen direkt!
     const result = await model.generateContent(fullPrompt);
     const comicData = JSON.parse(result.response.text());
 

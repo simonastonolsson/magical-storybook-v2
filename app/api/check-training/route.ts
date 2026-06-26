@@ -14,13 +14,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const prediction = await replicate.predictions.get(trainingId);
+    // VIKTIGT: Vi använder trainings.get för att få fram både modellen och versionen
+    const training = await replicate.trainings.get(trainingId);
     
-    // Vi lägger till "version" här så att framsidan kan spara den direkt!
+    // Vi pusslar ihop den perfekta sökvägen (t.ex. simon/modell:version)
+    const assembledPath = (training as any).model && training.version 
+      ? `${(training as any).model}:${training.version}` 
+      : training.version || training.output;
+
     return NextResponse.json({ 
-      status: prediction.status, 
-      output: prediction.output,
-      version: prediction.version
+      status: training.status, 
+      fullPath: assembledPath
     });
   } catch (error) {
     console.error('Check training error:', error);

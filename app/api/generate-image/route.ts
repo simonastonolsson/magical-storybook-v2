@@ -9,11 +9,7 @@ export async function POST(request: Request) {
   try {
     const { prompt, trainedModelId } = await request.json();
 
-    if (!trainedModelId) {
-      return NextResponse.json({ error: 'Trained model ID is missing!' }, { status: 400 });
-    }
-
-    console.log(`Skapar bild med ren prompt: ${prompt}`);
+    if (!trainedModelId) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
 
     const output = await replicate.run(
       trainedModelId as `${string}/${string}:${string}`, 
@@ -24,19 +20,17 @@ export async function POST(request: Request) {
           height: 768,
           num_inference_steps: 28, 
           guidance_scale: 3.5,     
-          lora_scale: 1.0         // Höjd från 0.85 till 1.0 för att säkra ansiktslikheten!
+          lora_scale: 1.1         // Den gyllene medelvägen! Starkt ansikte utan att bli överstyrd.
         }
       }
     );
 
     const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
-
-    if (!finalImageUrl) return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
-
+    if (!finalImageUrl) return NextResponse.json({ error: 'Failed' }, { status: 500 });
     return NextResponse.json({ imageUrl: finalImageUrl });
 
   } catch (error) {
-    console.error('Image generation error:', error);
-    return NextResponse.json({ error: 'Failed to generate image' }, { status: 500 });
+    console.error('Error:', error);
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

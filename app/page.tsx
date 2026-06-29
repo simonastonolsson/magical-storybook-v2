@@ -21,7 +21,6 @@ export default function Page() {
 
   useEffect(() => {
     const savedModel = localStorage.getItem('my_saved_lora_model');
-    // Vi kollar så att den sparade modellen faktiskt innehåller ett "/" så vi vet att det är rätt format
     if (savedModel && savedModel.includes('/')) {
       setTrainedModelId(savedModel);
       setTrainingStatus(`🎉 Hittade din sparade AI-modell! Redo att skapa berättelser.`);
@@ -34,6 +33,37 @@ export default function Page() {
     }
   };
 
+  // MAGIN: Vår nya bild-optimerare som krymper bilderna och undviker Vercels 4.5MB-gräns!
+  const resizeImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 800; // Perfekt storlek för AI-träning
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > MAX_SIZE) {
+          height *= MAX_SIZE / width;
+          width = MAX_SIZE;
+        } else if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height;
+          height = MAX_SIZE;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Komprimerar till JPEG, 80% kvalitet. Gör filen minimal!
+        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8);
+      };
+      img.src = url;
+    });
+  };
+
   const handleStartTraining = async () => {
     if (selectedFiles.length < 5) {
       alert("Ladda upp minst 5 bilder för bästa AI-resultat!");
@@ -42,11 +72,16 @@ export default function Page() {
 
     setIsTraining(true);
     try {
-      setTrainingStatus('📦 Packar bilderna till en zip-fil...');
+      setTrainingStatus('📦 Optimerar och packar bilderna...');
       const zip = new JSZip();
-      selectedFiles.forEach((file, index) => {
-        zip.file(`image_${index}.${file.name.split('.').pop()}`, file);
-      });
+      
+      // Vi kör optimeraren på varje bild innan vi zippar!
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const resizedBlob = await resizeImage(file);
+        zip.file(`image_${i}.jpg`, resizedBlob);
+      }
+      
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
       setTrainingStatus('☁️ Laddar upp till servern...');
@@ -54,6 +89,7 @@ export default function Page() {
         method: 'POST',
         body: zipBlob,
       });
+      
       if (!uploadRes.ok) throw new Error('Failed to upload zip');
       const { url: zipUrl } = await uploadRes.json();
 
@@ -74,18 +110,14 @@ export default function Page() {
 
         if (checkData.status === 'succeeded') {
           clearInterval(checkInterval);
-          
-          // Här hämtar vi den perfekt ihoppusslade vägen från vår uppdaterade server!
           const perfectModelPath = checkData.fullPath;
-          
           setTrainedModelId(perfectModelPath);
           localStorage.setItem('my_saved_lora_model', perfectModelPath);
-          
           setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
           setIsTraining(false);
         } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
           clearInterval(checkInterval);
-          setTrainingStatus('❌ Träningen misslyckades. Försök igen med mer högupplösta bilder.');
+          setTrainingStatus('❌ Träningen misslyckades. Försök igen.');
           setIsTraining(false);
         } else {
           setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
@@ -94,7 +126,7 @@ export default function Page() {
 
     } catch (error) {
       console.error(error);
-      setTrainingStatus('❌ Ett fel uppstod under träningen.');
+      setTrainingStatus('❌ Ett fel uppstod vid uppladdningen. Bilderna kan fortfarande vara för stora.');
       setIsTraining(false);
     }
   };

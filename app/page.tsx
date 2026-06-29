@@ -33,14 +33,14 @@ export default function Page() {
     }
   };
 
-  // MAGIN: Vår nya bild-optimerare som krymper bilderna och undviker Vercels 4.5MB-gräns!
+  // HYPER-OPTIMERING: Vi krymper till AI:ns standard (512x512)
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 800; // Perfekt storlek för AI-träning
+        const MAX_SIZE = 512; 
         let width = img.width;
         let height = img.height;
 
@@ -57,8 +57,8 @@ export default function Page() {
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
         
-        // Komprimerar till JPEG, 80% kvalitet. Gör filen minimal!
-        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8);
+        // Komprimerar hårdare (0.6) för att garantera < 1MB
+        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.6);
       };
       img.src = url;
     });
@@ -75,7 +75,6 @@ export default function Page() {
       setTrainingStatus('📦 Optimerar och packar bilderna...');
       const zip = new JSZip();
       
-      // Vi kör optimeraren på varje bild innan vi zippar!
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         const resizedBlob = await resizeImage(file);
@@ -83,8 +82,10 @@ export default function Page() {
       }
       
       const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
+      console.log(`Zippens storlek är nu: ${sizeMB} MB`);
 
-      setTrainingStatus('☁️ Laddar upp till servern...');
+      setTrainingStatus(`☁️ Laddar upp till servern (${sizeMB} MB)...`);
       const uploadRes = await fetch(`/api/upload?filename=training_data.zip`, {
         method: 'POST',
         body: zipBlob,

@@ -15,4 +15,5 @@ export default function Page() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [generated
+  const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+  const

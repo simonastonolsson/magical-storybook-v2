@@ -33,7 +33,7 @@ export default function Page() {
     }
   };
 
-  // HYPER-OPTIMERING: Vi krymper till AI:ns standard (512x512)
+  // Optimerar bilderna för att de ska bli pyttesmå textsträngar
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -57,7 +57,6 @@ export default function Page() {
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
         
-        // Komprimerar hårdare (0.6) för att garantera < 1MB
         canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.6);
       };
       img.src = url;
@@ -83,51 +82,59 @@ export default function Page() {
       
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
-      console.log(`Zippens storlek är nu: ${sizeMB} MB`);
-
-      setTrainingStatus(`☁️ Laddar upp till servern (${sizeMB} MB)...`);
-      const uploadRes = await fetch(`/api/upload?filename=training_data.zip`, {
-        method: 'POST',
-        body: zipBlob,
-      });
       
-      if (!uploadRes.ok) throw new Error('Failed to upload zip');
-      const { url: zipUrl } = await uploadRes.json();
-
-      setTrainingStatus('🧠 Tränar din unika AI-modell... (Detta tar ca 5-10 min)');
-      const trainRes = await fetch('/api/train-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zipUrl }),
-      });
-      if (!trainRes.ok) throw new Error('Failed to start training');
-      const { trainingId } = await trainRes.json();
-
-      setTrainingStatus('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
+      setTrainingStatus(`🚀 Kringgår molnet... omvandlar filen till text (${sizeMB} MB)...`);
       
-      const checkInterval = setInterval(async () => {
-        const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
-        const checkData = await checkRes.json();
+      // DEN ULTIMATA LÖSNINGEN: Vi förvandlar hela Zip-filen till en Base64-text och skickar direkt till Replicate!
+      // Inget sparas på Vercel längre!
+      const reader = new FileReader();
+      reader.readAsDataURL(zipBlob);
+      reader.onloadend = async () => {
+        const base64Zip = reader.result;
+        
+        try {
+          setTrainingStatus('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
+          const trainRes = await fetch('/api/train-model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ zipUrl: base64Zip }),
+          });
+          
+          if (!trainRes.ok) throw new Error('Failed to start training');
+          const { trainingId } = await trainRes.json();
 
-        if (checkData.status === 'succeeded') {
-          clearInterval(checkInterval);
-          const perfectModelPath = checkData.fullPath;
-          setTrainedModelId(perfectModelPath);
-          localStorage.setItem('my_saved_lora_model', perfectModelPath);
-          setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
+          setTrainingStatus('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
+          
+          const checkInterval = setInterval(async () => {
+            const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
+            const checkData = await checkRes.json();
+
+            if (checkData.status === 'succeeded') {
+              clearInterval(checkInterval);
+              const perfectModelPath = checkData.fullPath;
+              setTrainedModelId(perfectModelPath);
+              localStorage.setItem('my_saved_lora_model', perfectModelPath);
+              setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
+              setIsTraining(false);
+            } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+              clearInterval(checkInterval);
+              setTrainingStatus('❌ Träningen misslyckades. Försök igen.');
+              setIsTraining(false);
+            } else {
+              setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
+            }
+          }, 15000);
+          
+        } catch (error) {
+          console.error(error);
+          setTrainingStatus('❌ Ett fel uppstod vid start av träningen.');
           setIsTraining(false);
-        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-          clearInterval(checkInterval);
-          setTrainingStatus('❌ Träningen misslyckades. Försök igen.');
-          setIsTraining(false);
-        } else {
-          setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
         }
-      }, 15000);
+      };
 
     } catch (error) {
       console.error(error);
-      setTrainingStatus('❌ Ett fel uppstod vid uppladdningen. Bilderna kan fortfarande vara för stora.');
+      setTrainingStatus('❌ Ett fel uppstod när bilderna skulle packas.');
       setIsTraining(false);
     }
   };
@@ -259,24 +266,4 @@ export default function Page() {
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
                 <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="p-4 flex flex-col items-center justify-center text-center">
-                      <span className="text-gray-400 text-5xl mb-2">{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
-                      <span className="text-xs text-gray-500 font-mono">{currentlyGeneratingPanel === panel.panel_number ? 'AI is drawing...' : 'In queue...'}</span>
-                    </div>
-                  )}
-                  <div className="absolute top-2 left-2 bg-yellow-400 text-black font-black w-8 h-8 flex items-center justify-center rounded-full border-2 border-black z-10">{panel.panel_number}</div>
-                </div>
-                <div className="p-4 bg-yellow-50 min-h-[100px] flex items-center">
-                  <p className="text-gray-800 font-medium text-lg leading-relaxed">{panel.narration}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
+                    /* 

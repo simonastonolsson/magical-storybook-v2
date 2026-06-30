@@ -33,7 +33,6 @@ export default function Page() {
     }
   };
 
-  // NY SCALER: Skarpare och mer detaljerade bilder (768px, 90% kvalitet) för perfekt ansiktslikhet!
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -203,40 +202,4 @@ export default function Page() {
     <main className="flex min-h-screen flex-col items-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50 font-sans">
       <div className="mb-12 max-w-3xl mt-10">
         <h1 className="text-5xl font-bold text-gray-800">
-          Turn any idea into a <span className="text-purple-500">comic book</span>
-        </h1>
-        <p className="mt-4 text-lg text-gray-600">
-          Step 1: Train the AI on your character. Step 2: Write a story!
-        </p>
-      </div>
-
-      <div className="w-full max-w-2xl space-y-6">
-        
-        <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
-          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train AI Character (Upload 5-15 photos)</h3>
-          <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
-          
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
-                Choose Photos
-              </button>
-              {selectedFiles.length > 0 && (
-                <span className="text-gray-700 font-medium">{selectedFiles.length} photos selected</span>
-              )}
-            </div>
-
-            {selectedFiles.length >= 5 && !trainedModelId && (
-              <button onClick={handleStartTraining} disabled={isTraining} className="mt-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition disabled:opacity-50">
-                {isTraining ? 'Training in progress...' : '🚀 Start AI Training'}
-              </button>
-            )}
-
-            {trainingStatus && (
-              <div className="mt-2 p-3 bg-blue-50 text-blue-800 rounded-lg font-mono text-sm">
-                {trainingStatus}
-              </div>
-            )}
-            
-            {trainedModelId && (
-              <button onClick={() => { localStorage.removeItem('my_saved_lora_model'); setTrainedModelId(null); setTrainingStatus(''); }} className="text-xs text-red-500 hover:underline text
+          Turn any idea into a <sp

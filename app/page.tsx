@@ -33,7 +33,6 @@ export default function Page() {
     }
   };
 
-  // Optimerar bilderna för att de ska bli pyttesmå textsträngar
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -85,8 +84,6 @@ export default function Page() {
       
       setTrainingStatus(`🚀 Kringgår molnet... omvandlar filen till text (${sizeMB} MB)...`);
       
-      // DEN ULTIMATA LÖSNINGEN: Vi förvandlar hela Zip-filen till en Base64-text och skickar direkt till Replicate!
-      // Inget sparas på Vercel längre!
       const reader = new FileReader();
       reader.readAsDataURL(zipBlob);
       reader.onloadend = async () => {
@@ -266,4 +263,23 @@ export default function Page() {
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
                 <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
-                    /* 
+                    <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="p-4 flex flex-col items-center justify-center text-center">
+                      <span className="text-gray-400 text-5xl mb-2">{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
+                      <span className="text-xs text-gray-500 font-mono">{currentlyGeneratingPanel === panel.panel_number ? 'AI is drawing...' : 'In queue...'}</span>
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 bg-yellow-400 text-black font-black w-8 h-8 flex items-center justify-center rounded-full border-2 border-black z-10">{panel.panel_number}</div>
+                </div>
+                <div className="p-4 bg-yellow-50 min-h-[100px] flex items-center">
+                  <p className="text-gray-800 font-medium text-lg leading-relaxed">{panel.narration}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

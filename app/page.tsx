@@ -174,32 +174,4 @@ export default function Page() {
       return;
     }
     setIsLoadingScript(true);
-    setComic(null);
-    setGeneratedImages({});
-
-    try {
-      const response = await fetch('/api/story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: memory }),
-      });
-
-      if (!response.ok) throw new Error('Something went wrong on the server.');
-
-      const data = await response.json();
-      setComic(data.comic);
-      generateImagesForComic(data.comic);
-
-    } catch (error) {
-      console.error("Story error:", error);
-      alert("Något gick snett med manuset, försök igen.");
-    } finally {
-      setIsLoadingScript(false);
-    }
-  };
-
-  return (
-    <main className="flex min-h-screen flex-col items-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50 font-sans">
-      <div className="mb-12 max-w-3xl mt-10">
-        <h1 className="text-5xl font-bold text-gray-800">
-          Turn any idea into a <sp
+    setComic(

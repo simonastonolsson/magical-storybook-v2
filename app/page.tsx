@@ -33,13 +33,14 @@ export default function Page() {
     }
   };
 
+  // NY SCALER: Skarpare och mer detaljerade bilder (768px, 90% kvalitet) för perfekt ansiktslikhet!
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 512; 
+        const MAX_SIZE = 768; 
         let width = img.width;
         let height = img.height;
 
@@ -56,7 +57,7 @@ export default function Page() {
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
         
-        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.6);
+        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.9);
       };
       img.src = url;
     });
@@ -238,48 +239,4 @@ export default function Page() {
             )}
             
             {trainedModelId && (
-              <button onClick={() => { localStorage.removeItem('my_saved_lora_model'); setTrainedModelId(null); setTrainingStatus(''); }} className="text-xs text-red-500 hover:underline text-left mt-1">
-                🗑️ Ta bort sparad AI och träna en ny karaktär
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
-          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. A space journey to find the missing chocolate chip cookie..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
-        </div>
-
-        <button type="button" onClick={handleCreateStory} disabled={isLoadingScript || !trainedModelId} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-xl font-bold text-white hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100">
-          {isLoadingScript ? 'Directing comic script...' : '🪄 Generate Comic Book'}
-        </button>
-      </div>
-
-      {comic && (
-        <div className="mt-16 w-full max-w-5xl">
-          <h2 className="text-4xl font-black text-gray-800 mb-8 uppercase tracking-wide">{comic.title}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {comic.panels.map((panel: any) => (
-              <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
-                <div className="bg-gray-200 w-full h-64 flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
-                  {generatedImages[panel.panel_number] ? (
-                    <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="p-4 flex flex-col items-center justify-center text-center">
-                      <span className="text-gray-400 text-5xl mb-2">{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
-                      <span className="text-xs text-gray-500 font-mono">{currentlyGeneratingPanel === panel.panel_number ? 'AI is drawing...' : 'In queue...'}</span>
-                    </div>
-                  )}
-                  <div className="absolute top-2 left-2 bg-yellow-400 text-black font-black w-8 h-8 flex items-center justify-center rounded-full border-2 border-black z-10">{panel.panel_number}</div>
-                </div>
-                <div className="p-4 bg-yellow-50 min-h-[100px] flex items-center">
-                  <p className="text-gray-800 font-medium text-lg leading-relaxed">{panel.narration}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
+              <button onClick={() => { localStorage.removeItem('my_saved_lora_model'); setTrainedModelId(null); setTrainingStatus(''); }} className="text-xs text-red-500 hover:underline text

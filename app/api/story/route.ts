@@ -7,7 +7,6 @@ export async function POST(req: Request) {
     if (!apiKey) return new Response(JSON.stringify({ error: "API key missing" }), { status: 500 });
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash", 
       generationConfig: { responseMimeType: "application/json" }
@@ -20,15 +19,15 @@ export async function POST(req: Request) {
       CRITICAL RULES:
       1. "title" & "narration": Use the character's REAL NAME. Write narration in the SAME LANGUAGE as the user's prompt.
       2. "image_prompt": Write in ENGLISH.
-         - CRITICAL STYLE RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, a blonde woman, "
-         - NEVER use the real name in the image prompt. 
-         - CRITICAL CAMERA RULE: Vary the camera angles. At least TWO panels must be a "close-up shot" or "medium shot".
-         - Example: "Comic book panel illustration, graphic novel art, drawing of TOK, a blonde woman, close-up shot, smiling warmly, jungle background."
-
+         - CRITICAL STYLE RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, "
+         - CRITICAL APPEARANCE RULE: NEVER describe the character's hair color, gender, or facial features (do NOT write "blonde", "man", "woman", etc.). Just use "TOK" and let the AI handle the face. Focus ONLY on clothing, action, and environment.
+         - CRITICAL FACE RULE: Keep facial expressions simple (smiling, neutral, determined).
+         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). 
+         
       Return ONLY a JSON object:
       {
         "title": "Title",
-        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, a blonde woman, ..." }]
+        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, wearing a casual shirt, medium shot..." }]
       }`;
 
     const result = await model.generateContent(fullPrompt);

@@ -139,39 +139,3 @@ export default function Page() {
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const generateImagesForComic = async (comicData: any) => {
-    setIsGeneratingImages(true);
-    for (let i = 0; i < comicData.panels.length; i++) {
-      const panel = comicData.panels[i];
-      setCurrentlyGeneratingPanel(panel.panel_number);
-
-      if (i > 0) await delay(10000); 
-
-      try {
-        const response = await fetch('/api/generate-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            prompt: panel.image_prompt, 
-            trainedModelId: trainedModelId 
-          }),
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setGeneratedImages(prev => ({...prev, [panel.panel_number]: data.imageUrl}));
-        }
-      } catch (err) {
-        console.error(`Failed to generate image`, err);
-      }
-      setCurrentlyGeneratingPanel(null);
-    }
-    setIsGeneratingImages(false);
-  };
-
-  const handleCreateStory = async () => {
-    if (!memory.trim()) {
-      alert("Beskriv ett äventyr först!");
-      return;
-    }
-    setIsLoadingScript(true);
-    setComic(

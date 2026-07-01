@@ -8,35 +8,42 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    const companionInstruction = secondaryName && secondaryTrigger
-      ? `There is also a companion in the story: ${secondaryTrigger}. You must include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (describing them naturally, e.g. "standing with a golden retriever dog" or "hugging a cat").`
-      : "There are no other main companions in this story.";
+    // Vi bestämmer inställningarna för din följeslagare (t.ex. Baran)
+    const hasCompanion = !!(secondaryName && secondaryTrigger);
+    const companionInfo = hasCompanion
+      ? `Companion's Name: "${secondaryName}". Companion's Trigger Word: "COMPANIONTOK". Companion's Description: "${secondaryTrigger}".`
+      : "No companion is selected.";
 
-    const fullPrompt = `You are an expert comic book director. The user's idea is: "${prompt}".
+    const fullPrompt = `You are an expert comic book director. Create a comic book script based on the user's idea: "${prompt}".
       
-      Primary character name: Simon (English trigger word is "TOK").
-      ${companionInstruction}
+      CHARACTERS:
+      - Main Character: Simon (Trigger Word: "TOK", Description: "an adult man"). Simon is ALWAYS a 30-year-old adult man.
+      - ${companionInfo}
 
-      CRITICAL ANCHOR ANALYSIS:
-      1. Identify the main character's name.
-      2. STRICT DEFAULT TO ADULT RULE: You must default to portraying Simon as a fully grown adult man (around 30 years old, using "an adult man").
-      3. Only use child descriptions if the user's prompt explicitly states they are a child (e.g. using words like "barn", "liten", "6 år").
-      4. If the name is "Simon", he is ALWAYS a 30-year-old adult man. Do NOT make him a child even if "pappa" or "father" is mentioned in the prompt.
-      5. If the user mentions "pappa" or "mamma", do NOT make Simon a child. Portray them as two adults (e.g., "Simon and his father Thomas, both adult men").
+      DIRECTOR RULES FOR WRITING:
+      1. Create exactly 4 panels, numbered strictly 1, 2, 3, 4. (NEVER skip panel 1).
+      2. Write "title" and panel "narration" in the SAME LANGUAGE as the user's prompt (Swedish in this case).
+      3. Write "image_prompt" in ENGLISH.
 
-      CRITICAL RULES:
-      1. "title" & "narration": Use the characters' REAL NAMES (Simon and others) in the narration. Write narration in the SAME LANGUAGE as the user's prompt.
-      2. "image_prompt": Write in ENGLISH.
-         - Comic book style: The style must be consistent graphic novel art.
-         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, " 
-         - MULTI-CHARACTER RULE: If a companion is active (${secondaryName || 'none'}), you MUST describe them naturally in the image_prompt (e.g., "drawing of TOK, an adult man, standing with a golden retriever dog, on an airplane").
-         - CRITICAL ISOLATION RULE: NEVER include other human characters in the image_prompt except Simon and the specified companion. Focus on the main characters to avoid AI confusion.
-         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple (smiling, neutral, determined).
+      CRITICAL IMAGE_PROMPT RULES (Write in English, consistent graphic novel style):
+      1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
+      2. Carefully decide who is in each scene and use the correct trigger words:
+         - If Simon (TOK) is in the scene: include "drawing of TOK, an adult man".
+         - If the companion (COMPANIONTOK) is in the scene: include "drawing of COMPANIONTOK, an adult man" (or the appropriate description like "drawing of COMPANIONTOK, a friendly golden retriever dog").
+         - If BOTH Simon and the companion are in the scene: include "drawing of TOK, an adult man, and COMPANIONTOK, [COMPANION_DESCRIPTION]" together in the prompt so they appear in the same image.
+         - If the scene is about a baby, or something else without Simon or the companion, describe it naturally (e.g., "drawing of a cute little baby wrapped in a blanket") and DO NOT include "TOK" or "COMPANIONTOK" in that prompt.
+      3. Keep the scene composition simple and focused on the characters. Do not add other random people.
          
-      Return ONLY a JSON object:
+      Return ONLY a JSON object with this exact structure:
       {
-        "title": "Title",
-        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, standing with a golden retriever, medium shot..." }]
+        "title": "A beautiful title in the prompt's language",
+        "panels": [
+          {
+            "panel_number": 1,
+            "narration": "Narration text in the prompt's language...",
+            "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, and COMPANIONTOK, an adult man, standing together..."
+          }
+        ]
       }`;
 
     let result;
@@ -48,7 +55,7 @@ export async function POST(req: Request) {
       });
       result = await model.generateContent(fullPrompt);
     } catch (primaryError) {
-      console.warn("gemini-2.5-flash är överbelastad (503), testar stabil fallback gemini-2.5-flash-lite...");
+      console.warn("gemini-2.5-flash är överbelastad, testar fallback gemini-2.5-flash-lite...");
       
       // Fallback till den stensäkra gemini-2.5-flash-lite
       const fallbackModel = genAI.getGenerativeModel({

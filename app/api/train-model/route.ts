@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const training = await replicate.trainings.create(
       'ostris',
       'flux-dev-lora-trainer',
-      '26dce37af90b9d997eeb970d92e47de3064d46c30504ae376c75bef6a9022d2', // HÄR ÄR DEN RIKTIGA VERSIONEN!
+      '26dce37af90b9d997eeb970d92e47de3064d46c300504ae376c75bef6a9022d2', // NU HELT KORREKT KOD!
       {
         destination: `simonastonolsson/comic-hero-${Date.now()}`,
         input: {
@@ -36,4 +36,3 @@ export async function POST(request: Request) {
     console.error('Training start error:', error);
     return NextResponse.json({ error: 'Failed to start training' }, { status: 500 });
   }
-}

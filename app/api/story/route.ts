@@ -48,11 +48,11 @@ export async function POST(req: Request) {
       });
       result = await model.generateContent(fullPrompt);
     } catch (primaryError) {
-      console.warn("gemini-2.5-flash är överbelastad (503), testar stabil fallback gemini-1.5-flash...");
+      console.warn("gemini-2.5-flash är överbelastad (503), testar stabil fallback gemini-2.5-flash-lite...");
       
-      // Fallback till den extremt driftsäkra gemini-1.5-flash
+      // Fallback till den stensäkra gemini-2.5-flash-lite
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash-lite",
         generationConfig: { responseMimeType: "application/json" }
       });
       result = await fallbackModel.generateContent(fullPrompt);

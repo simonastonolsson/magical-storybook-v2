@@ -33,7 +33,21 @@ export async function POST(req: Request) {
       }`;
 
     const result = await model.generateContent(fullPrompt);
-    const comicData = JSON.parse(result.response.text());
+    
+    // HÄMTA SVAR OCH RENSDA EVENTUELL MISSLYCKAD FORMATEring
+    let text = result.response.text();
+    
+    // 1. Ta bort markdown-kodblock (```json ... ```) ifall Gemini lade till det trots inställningarna
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    // 2. Ta bort eventuella kommentarer som Gemini kan ha lagt till (t.ex. // Panel 2)
+    text = text.replace(/\/\/.*$/gm, "");
+    
+    // 3. Ta bort extra kommatecken precis innan stängande måsvingar/parenteser (trailing commas)
+    text = text.replace(/,\s*([\]}])/g, "$1");
+
+    // Nu kan vi parsa helt tryggt och säkert!
+    const comicData = JSON.parse(text);
 
     return new Response(JSON.stringify({ comic: comicData }), {
       headers: { "Content-Type": "application/json" },

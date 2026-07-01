@@ -22,6 +22,11 @@ export default function Page() {
   const [customPrompts, setCustomPrompts] = useState<Record<number, string>>({});
   const [panelsLoading, setPanelsLoading] = useState<Record<number, boolean>>({});
 
+  // MULTI-LORA STATER
+  const [extraLoraId, setExtraLoraId] = useState('');
+  const [extraLoraName, setExtraLoraName] = useState('');
+  const [extraLoraTrigger, setExtraLoraTrigger] = useState('');
+
   useEffect(() => {
     const savedModel = localStorage.getItem('my_saved_lora_model');
     if (savedModel && savedModel.includes('/')) {
@@ -36,7 +41,6 @@ export default function Page() {
     }
   };
 
-  // Resizer som ger knivskarpa (768px, 90% kvalitet) bilder för perfekt ansiktslikhet!
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -88,7 +92,6 @@ export default function Page() {
       
       setTrainingStatus(`☁️ Laddar upp säkert till molnet (${sizeMB} MB)...`);
       
-      // DEN PERFEKTA LÖSNINGEN: Vi laddar upp till tmpfiles.org och får en äkta HTTP-länk!
       const formData = new FormData();
       formData.append('file', zipBlob, 'training_data.zip');
 
@@ -99,10 +102,7 @@ export default function Page() {
 
       if (!uploadRes.ok) throw new Error('Failed to upload to temporary storage');
       const uploadData = await uploadRes.json();
-      
-      // Omvandla till direkt nedladdningslänk för Replicate
       const rawZipUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-      console.log("Riktig ZIP-länk skickas till Replicate:", rawZipUrl);
 
       setTrainingStatus('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
       const trainRes = await fetch('/api/train-model', {
@@ -159,7 +159,9 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             prompt: panel.image_prompt, 
-            trainedModelId: trainedModelId 
+            trainedModelId: trainedModelId,
+            extraLoraId: extraLoraId || null, // Skickar med den andra gubben/hunden om den finns!
+            extraLoraScale: 0.8 // Perfekt balanserad styrka
           }),
         });
         
@@ -188,7 +190,11 @@ export default function Page() {
       const response = await fetch('/api/story', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: memory }),
+        body: JSON.stringify({ 
+          prompt: memory,
+          secondaryName: extraLoraName || null,
+          secondaryTrigger: extraLoraTrigger || null
+        }),
       });
 
       if (!response.ok) throw new Error('Something went wrong on the server.');
@@ -227,7 +233,9 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           prompt: newPrompt, 
-          trainedModelId: trainedModelId 
+          trainedModelId: trainedModelId,
+          extraLoraId: extraLoraId || null,
+          extraLoraScale: 0.8
         }),
       });
       
@@ -271,8 +279,9 @@ export default function Page() {
 
       <div className="w-full max-w-2xl space-y-6">
         
+        {/* SKAPARENS PRIMÄRA LORA */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
-          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train AI Character (Upload 5-15 photos)</h3>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train Main AI Character (Simon)</h3>
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
           
           <div className="flex flex-col gap-4">
@@ -305,9 +314,41 @@ export default function Page() {
           </div>
         </div>
 
+        {/* VALFRITT: LÄGG TILL EXTRAGUBBE / HUND */}
+        <div className={`rounded-[2rem] border-4 border-dashed border-blue-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">🐕 Optional: Add a Friend or Pet (Extra LoRA)</h3>
+          <p className="text-xs text-gray-500 mb-4">Paste another trained model from Replicate to let them interact in the same story!</p>
+          
+          <div className="grid grid-cols-1 gap-3">
+            <input 
+              type="text" 
+              placeholder="Replicate Model ID (e.g. simonastonolsson/my-dog-lora:abc123xyz...)" 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-gray-800"
+              value={extraLoraId}
+              onChange={(e) => setExtraLoraId(e.target.value)}
+            />
+            <div className="flex gap-3">
+              <input 
+                type="text" 
+                placeholder="Name (e.g. Fido)" 
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-gray-800"
+                value={extraLoraName}
+                onChange={(e) => setExtraLoraName(e.target.value)}
+              />
+              <input 
+                type="text" 
+                placeholder="Trigger word (e.g. DOGTOK)" 
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-gray-800"
+                value={extraLoraTrigger}
+                onChange={(e) => setExtraLoraTrigger(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
         <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
-          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. A space journey to find the missing chocolate chip cookie..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
+          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. Simon and Fido going on a spaceship ride..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
         </div>
 
         <button type="button" onClick={handleCreateStory} disabled={isLoadingScript || !trainedModelId} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-xl font-bold text-white hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100">

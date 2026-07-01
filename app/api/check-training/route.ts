@@ -14,12 +14,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const training = await replicate.trainings.get(id);
+    // FIXEN: Vi tvingar TypeScript att tolka svaret som "any" för att slippa rigid typkontroll vid bygget
+    const training = (await replicate.trainings.get(id)) as any;
     console.log("Training status:", training.status);
 
     if (training.status === 'succeeded') {
       // HÄR ÄR FIXEN: Vi hämtar den direkta .tar-länken till vikterna från Replicate CDN!
-      // Detta är 100% skottsäkert och kraschar aldrig.
       const weightsUrl = training.output?.weights || null;
       
       let fullPath = weightsUrl;

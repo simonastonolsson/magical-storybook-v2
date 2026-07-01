@@ -16,17 +16,18 @@ export async function POST(request: Request) {
     const targetTriggerWord = triggerWord || 'TOK';
     console.log(`Startar träning med triggerord: ${targetTriggerWord}`);
 
-    // HÄR ÄR DEN MAGISKA LÖSNINGEN:
-    // Vi skapar modellen först så att destinationen garanterat existerar på Replicate!
     const modelName = `comic-hero-${Date.now()}`;
     
     try {
-      await replicate.models.create({
-        owner: 'simonastonolsson',
-        name: modelName,
-        visibility: 'private',
-        hardware: 'cpu' // cpu räcker eftersom det bara är en behållare för lora-vikterna
-      });
+      // FIXEN: Vi skickar de tre separata argumenten och castar till "any" för att garantera ett grönt bygge!
+      await (replicate.models as any).create(
+        'simonastonolsson',
+        modelName,
+        {
+          visibility: 'private',
+          hardware: 'cpu'
+        }
+      );
       console.log(`Skapade modellen på Replicate: simonastonolsson/${modelName}`);
     } catch (createError) {
       console.error('Kunde inte skapa modell automatiskt, försöker köra träning ändå:', createError);

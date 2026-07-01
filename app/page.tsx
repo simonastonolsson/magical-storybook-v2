@@ -36,6 +36,7 @@ export default function Page() {
     }
   };
 
+  // Resizer som ger knivskarpa (768px, 90% kvalitet) bilder för perfekt ansiktslikhet!
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -85,56 +86,59 @@ export default function Page() {
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
       
-      setTrainingStatus(`🚀 Kringgår molnet... omvandlar filen till text (${sizeMB} MB)...`);
+      setTrainingStatus(`☁️ Laddar upp säkert till molnet (${sizeMB} MB)...`);
       
-      const reader = new FileReader();
-      reader.readAsDataURL(zipBlob);
-      reader.onloadend = async () => {
-        const base64Zip = reader.result;
-        
-        try {
-          setTrainingStatus('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
-          const trainRes = await fetch('/api/train-model', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ zipUrl: base64Zip }),
-          });
-          
-          if (!trainRes.ok) throw new Error('Failed to start training');
-          const { trainingId } = await trainRes.json();
+      // DEN PERFEKTA LÖSNINGEN: Vi laddar upp till tmpfiles.org och får en äkta HTTP-länk!
+      const formData = new FormData();
+      formData.append('file', zipBlob, 'training_data.zip');
 
-          setTrainingStatus('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
-          
-          const checkInterval = setInterval(async () => {
-            const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
-            const checkData = await checkRes.json();
+      const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-            if (checkData.status === 'succeeded') {
-              clearInterval(checkInterval);
-              const perfectModelPath = checkData.fullPath;
-              setTrainedModelId(perfectModelPath);
-              localStorage.setItem('my_saved_lora_model', perfectModelPath);
-              setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
-              setIsTraining(false);
-            } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-              clearInterval(checkInterval);
-              setTrainingStatus('❌ Träningen misslyckades. Försök igen.');
-              setIsTraining(false);
-            } else {
-              setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
-            }
-          }, 15000);
-          
-        } catch (error) {
-          console.error(error);
-          setTrainingStatus('❌ Ett fel uppstod vid start av träningen.');
+      if (!uploadRes.ok) throw new Error('Failed to upload to temporary storage');
+      const uploadData = await uploadRes.json();
+      
+      // Omvandla till direkt nedladdningslänk för Replicate
+      const rawZipUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+      console.log("Riktig ZIP-länk skickas till Replicate:", rawZipUrl);
+
+      setTrainingStatus('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
+      const trainRes = await fetch('/api/train-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zipUrl: rawZipUrl }),
+      });
+      
+      if (!trainRes.ok) throw new Error('Failed to start training');
+      const { trainingId } = await trainRes.json();
+
+      setTrainingStatus('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
+      
+      const checkInterval = setInterval(async () => {
+        const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
+        const checkData = await checkRes.json();
+
+        if (checkData.status === 'succeeded') {
+          clearInterval(checkInterval);
+          const perfectModelPath = checkData.fullPath;
+          setTrainedModelId(perfectModelPath);
+          localStorage.setItem('my_saved_lora_model', perfectModelPath);
+          setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
           setIsTraining(false);
+        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+          clearInterval(checkInterval);
+          setTrainingStatus('❌ Träningen misslyckades. Försök igen.');
+          setIsTraining(false);
+        } else {
+          setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
         }
-      };
-
+      }, 15000);
+      
     } catch (error) {
       console.error(error);
-      setTrainingStatus('❌ Ett fel uppstod när bilderna skulle packas.');
+      setTrainingStatus('❌ Ett fel uppstod vid start av träningen.');
       setIsTraining(false);
     }
   };

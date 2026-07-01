@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
+    const { prompt, secondaryName, secondaryTrigger } = await req.json();
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return new Response(JSON.stringify({ error: "API key missing" }), { status: 500 });
 
@@ -12,41 +12,41 @@ export async function POST(req: Request) {
       generationConfig: { responseMimeType: "application/json" }
     });
 
+    // Vi berättar för Gemini om den extra karaktären finns med
+    const secondaryInfo = secondaryName && secondaryTrigger 
+      ? `There is also an optional secondary character: Name is "${secondaryName}", English trigger word is "${secondaryTrigger}".`
+      : "";
+
     const fullPrompt = `You are an expert comic book director. The user's idea is: "${prompt}".
       
-      CRITICAL ANALYSIS RULE:
-      1. Carefully analyze the user's prompt to identify the main character's age and gender (e.g., adult man, adult woman, young boy, young girl, elderly man, etc.).
-      2. NEVER assume or guess the age. If the prompt mentions "Simon", look for cues. If Simon is the creator/adult, portray him as a fully grown adult man. If the prompt mentions a child, son, or young age (e.g., "Ville 6 år"), portray them exactly as that age.
-      3. Use this identified gender and age to create the perfect "anchor description" (e.g. "an adult man", "a young boy", "a young girl", "an adult woman").
+      Primary character name: Simon (English trigger word is "TOK").
+      ${secondaryInfo}
+
+      CRITICAL ANCHOR ANALYSIS:
+      1. Portray Simon as a fully grown adult man ("an adult man") unless the prompt explicitly says otherwise.
+      2. If a secondary character is provided, identify if they are a man, woman, dog, etc.
 
       CRITICAL RULES:
-      1. "title" & "narration": Use the character's REAL NAME. Write narration in the SAME LANGUAGE as the user's prompt.
+      1. "title" & "narration": Use the characters' REAL NAMES (Simon and ${secondaryName || ''}) in the narration. Write narration in the SAME LANGUAGE as the user's prompt.
       2. "image_prompt": Write in ENGLISH.
-         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, [ANCHOR_DESCRIPTION], " (Replace [ANCHOR_DESCRIPTION] with the identified age and gender, e.g., "an adult man" or "a young boy").
-         - CRITICAL ISOLATION RULE: NEVER include other human characters in the image_prompt. Focus 100% on TOK to avoid AI confusion.
-         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple (smiling, neutral, determined).
+         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, "
+         - MULTI-CHARACTER RULE: If the story involves both characters in a scene, you MUST include both of their trigger words in the image_prompt (e.g., "drawing of TOK, an adult man, standing next to ${secondaryTrigger || ''}, a friendly dog, " or "drawing of TOK and ${secondaryTrigger || ''} sitting together").
+         - CRITICAL ISOLATION RULE: NEVER include any other human characters except TOK and ${secondaryTrigger || 'none'}.
+         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple.
          
       Return ONLY a JSON object:
       {
         "title": "Title",
-        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, wearing a jacket, medium shot..." }]
+        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, standing with ${secondaryTrigger || 'his pet'}..." }]
       }`;
 
     const result = await model.generateContent(fullPrompt);
     
-    // HÄMTA SVAR OCH RENSDA EVENTUELL MISSLYCKAD FORMATEring
     let text = result.response.text();
-    
-    // 1. Ta bort markdown-kodblock (```json ... ```) ifall Gemini lade till det trots inställningarna
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    
-    // 2. Ta bort eventuella kommentarer som Gemini kan ha lagt till (t.ex. // Panel 2)
     text = text.replace(/\/\/.*$/gm, "");
-    
-    // 3. Ta bort extra kommatecken precis innan stängande måsvingar/parenteser (trailing commas)
     text = text.replace(/,\s*([\]}])/g, "$1");
 
-    // Nu kan vi parsa helt tryggt och säkert!
     const comicData = JSON.parse(text);
 
     return new Response(JSON.stringify({ comic: comicData }), {

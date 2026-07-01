@@ -24,9 +24,10 @@ export async function POST(request: Request) {
       lora_scale: 1.0 
     };
 
-    if (extraLoraId) {
+    // FIXEN: Vi filtrerar bort gamla trasiga "ostris/flux-dev-lora-trainer"-ID:n från minnet!
+    if (extraLoraId && !extraLoraId.includes('ostris/flux-dev-lora-trainer')) {
       let formattedLora = extraLoraId;
-      // FIXEN: Om extra_lora har ett kolon (ägare/modell:version), byter vi till snedstreck!
+      // Gör om kolon till snedstreck för att passa extra_lora i Flux-motorn
       if (formattedLora.includes(':') && !formattedLora.startsWith('http')) {
         formattedLora = formattedLora.replace(':', '/');
       }

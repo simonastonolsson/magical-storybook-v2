@@ -90,7 +90,7 @@ export default function Page() {
     });
   };
 
-  const startTrainingJob = async (files: File[], onStatusChange: (status: string) => void): Promise<string> => {
+  const startTrainingJob = async (files: File[], onStatusChange: (status: string) => void, triggerWord: string): Promise<string> => {
     onStatusChange('📦 Optimerar och packar bilderna...');
     const zip = new JSZip();
     
@@ -121,7 +121,7 @@ export default function Page() {
     const trainRes = await fetch('/api/train-model', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zipUrl: rawZipUrl }),
+      body: JSON.stringify({ zipUrl: rawZipUrl, triggerWord: triggerWord }), // SKICKAR MED UNIKT TRIGGERORD!
     });
     
     if (!trainRes.ok) throw new Error('Failed to start training');
@@ -158,7 +158,7 @@ export default function Page() {
     }
     setIsTraining(true);
     try {
-      const path = await startTrainingJob(selectedFiles, setTrainingStatus);
+      const path = await startTrainingJob(selectedFiles, setTrainingStatus, 'TOK');
       setTrainedModelId(path);
       localStorage.setItem('my_saved_lora_model', path);
       setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
@@ -177,7 +177,8 @@ export default function Page() {
     }
     setIsTrainingCompanion(true);
     try {
-      const path = await startTrainingJob(companionFiles, setCompanionTrainingStatus);
+      // HÄR SÄTTER VI DET UNIKA TRIGGERORDET 'COMPANIONTOK' FÖR KOMPISEN!
+      const path = await startTrainingJob(companionFiles, setCompanionTrainingStatus, 'COMPANIONTOK');
       setCompanionModelId(path);
       localStorage.setItem('my_saved_companion_lora_model', path);
       setCompanionTrainingStatus('✅ Träningen klar! Kompisens AI är redo.');

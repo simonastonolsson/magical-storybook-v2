@@ -15,20 +15,23 @@ export async function POST(request: Request) {
 
     console.log(`Skapar bild med prompt: ${prompt}`);
 
-    // Standardinställningar för primära karaktären (Simon/TOK)
     const input: any = {
       prompt: prompt,
       width: 1024,
       height: 768,
       num_inference_steps: 28, 
       guidance_scale: 3.5,     
-      lora_scale: 1.0 // Sänkt marginellt till 1.0 för att lämna utrymme för extra-LoRAn
+      lora_scale: 1.0 
     };
 
-    // MAGIN: Om en extra gubbe/hund skickas med, kopplar vi på den här!
     if (extraLoraId) {
-      input.extra_lora = extraLoraId;
-      input.extra_lora_scale = extraLoraScale || 0.8; // 0.8 är den perfekta balansen för att undvika "bleeding"
+      let formattedLora = extraLoraId;
+      // FIXEN: Om extra_lora har ett kolon (ägare/modell:version), byter vi till snedstreck!
+      if (formattedLora.includes(':') && !formattedLora.startsWith('http')) {
+        formattedLora = formattedLora.replace(':', '/');
+      }
+      input.extra_lora = formattedLora;
+      input.extra_lora_scale = extraLoraScale || 0.8;
     }
 
     const output = await replicate.run(

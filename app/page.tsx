@@ -8,6 +8,7 @@ export default function Page() {
   const [comic, setComic] = useState<any>(null);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
   
+  // PRIMÄR KARAKTÄR STATE (DIG)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState('');
@@ -15,6 +16,7 @@ export default function Page() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // BILD-GENERERING STATE
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
@@ -22,9 +24,17 @@ export default function Page() {
   const [customPrompts, setCustomPrompts] = useState<Record<number, string>>({});
   const [panelsLoading, setPanelsLoading] = useState<Record<number, boolean>>({});
 
-  // KUNDVÄNLIG MULTI-CHARACTER STATER
+  // KUNDVÄNLIG COMPANION-VÄLJARE
   const [companionType, setCompanionType] = useState<'none' | 'dog' | 'cat' | 'friend'>('none');
   const [companionName, setCompanionName] = useState('');
+  const [useCustomCompanionAI, setUseCustomCompanionAI] = useState(false);
+  
+  // SEKUNDÄR KARAKTÄR AI STATE (KOMPISEN)
+  const [companionFiles, setCompanionFiles] = useState<File[]>([]);
+  const [isTrainingCompanion, setIsTrainingCompanion] = useState(false);
+  const [companionTrainingStatus, setCompanionTrainingStatus] = useState('');
+  const [companionModelId, setCompanionModelId] = useState<string | null>(null);
+  const companionFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedModel = localStorage.getItem('my_saved_lora_model');
@@ -32,11 +42,22 @@ export default function Page() {
       setTrainedModelId(savedModel);
       setTrainingStatus(`🎉 Hittade din sparade AI-modell! Redo att skapa berättelser.`);
     }
+    const savedCompanionModel = localStorage.getItem('my_saved_companion_lora_model');
+    if (savedCompanionModel && savedCompanionModel.includes('/')) {
+      setCompanionModelId(savedCompanionModel);
+      setCompanionTrainingStatus(`🎉 Hittade sparad AI för kompisen!`);
+    }
   }, []);
 
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setSelectedFiles(Array.from(event.target.files));
+    }
+  };
+
+  const handleCompanionFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      setCompanionFiles(Array.from(event.target.files));
     }
   };
 
@@ -69,76 +90,102 @@ export default function Page() {
     });
   };
 
+  const startTrainingJob = async (files: File[], onStatusChange: (status: string) => void): Promise<string> => {
+    onStatusChange('📦 Optimerar och packar bilderna...');
+    const zip = new JSZip();
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const resizedBlob = await resizeImage(file);
+      zip.file(`image_${i}.jpg`, resizedBlob);
+    }
+    
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
+    
+    onStatusChange(`☁️ Laddar upp säkert till molnet (${sizeMB} MB)...`);
+    
+    const formData = new FormData();
+    formData.append('file', zipBlob, 'training_data.zip');
+
+    const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadRes.ok) throw new Error('Failed to upload to temporary storage');
+    const uploadData = await uploadRes.json();
+    const rawZipUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+
+    onStatusChange('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
+    const trainRes = await fetch('/api/train-model', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zipUrl: rawZipUrl }),
+    });
+    
+    if (!trainRes.ok) throw new Error('Failed to start training');
+    const { trainingId } = await trainRes.json();
+
+    return new Promise((resolve, reject) => {
+      onStatusChange('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
+      const checkInterval = setInterval(async () => {
+        try {
+          const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
+          const checkData = await checkRes.json();
+
+          if (checkData.status === 'succeeded') {
+            clearInterval(checkInterval);
+            resolve(checkData.fullPath);
+          } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
+            clearInterval(checkInterval);
+            reject(new Error('Training failed or was canceled'));
+          } else {
+            onStatusChange(`⏳ AI:n tränar... (Status: ${checkData.status})`);
+          }
+        } catch (err) {
+          clearInterval(checkInterval);
+          reject(err);
+        }
+      }, 15000);
+    });
+  };
+
   const handleStartTraining = async () => {
     if (selectedFiles.length < 5) {
       alert("Ladda upp minst 5 bilder för bästa AI-resultat!");
       return;
     }
-
     setIsTraining(true);
     try {
-      setTrainingStatus('📦 Optimerar och packar bilderna...');
-      const zip = new JSZip();
-      
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-        const resizedBlob = await resizeImage(file);
-        zip.file(`image_${i}.jpg`, resizedBlob);
-      }
-      
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
-      
-      setTrainingStatus(`☁️ Laddar upp säkert till molnet (${sizeMB} MB)...`);
-      
-      const formData = new FormData();
-      formData.append('file', zipBlob, 'training_data.zip');
-
-      const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadRes.ok) throw new Error('Failed to upload to temporary storage');
-      const uploadData = await uploadRes.json();
-      const rawZipUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-
-      setTrainingStatus('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
-      const trainRes = await fetch('/api/train-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zipUrl: rawZipUrl }),
-      });
-      
-      if (!trainRes.ok) throw new Error('Failed to start training');
-      const { trainingId } = await trainRes.json();
-
-      setTrainingStatus('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
-      
-      const checkInterval = setInterval(async () => {
-        const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
-        const checkData = await checkRes.json();
-
-        if (checkData.status === 'succeeded') {
-          clearInterval(checkInterval);
-          const perfectModelPath = checkData.fullPath;
-          setTrainedModelId(perfectModelPath);
-          localStorage.setItem('my_saved_lora_model', perfectModelPath);
-          setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
-          setIsTraining(false);
-        } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-          clearInterval(checkInterval);
-          setTrainingStatus('❌ Träningen misslyckades. Försök igen.');
-          setIsTraining(false);
-        } else {
-          setTrainingStatus(`⏳ AI:n tränar... (Status: ${checkData.status})`);
-        }
-      }, 15000);
-      
+      const path = await startTrainingJob(selectedFiles, setTrainingStatus);
+      setTrainedModelId(path);
+      localStorage.setItem('my_saved_lora_model', path);
+      setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
     } catch (error) {
       console.error(error);
       setTrainingStatus('❌ Ett fel uppstod vid start av träningen.');
+    } finally {
       setIsTraining(false);
+    }
+  };
+
+  const handleStartCompanionTraining = async () => {
+    if (companionFiles.length < 5) {
+      alert(`Ladda upp minst 5 bilder på ${companionName || "din kompis"}!`);
+      return;
+    }
+    setIsTrainingCompanion(true);
+    try {
+      const path = await startTrainingJob(companionFiles, setCompanionTrainingStatus);
+      setCompanionModelId(path);
+      localStorage.setItem('my_saved_companion_lora_model', path);
+      setCompanionTrainingStatus('✅ Träningen klar! Kompisens AI är redo.');
+    } catch (error) {
+      console.error(error);
+      setCompanionTrainingStatus('❌ Träningen misslyckades.');
+    } finally {
+      setIsTrainingCompanion(false);
     }
   };
 
@@ -158,7 +205,9 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             prompt: panel.image_prompt, 
-            trainedModelId: trainedModelId
+            trainedModelId: trainedModelId,
+            extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+            extraLoraScale: 0.8
           }),
         });
         
@@ -186,7 +235,13 @@ export default function Page() {
     let secondaryDescription = "";
     if (companionType === 'dog') secondaryDescription = `a friendly golden retriever dog named ${companionName || "Aston"}`;
     if (companionType === 'cat') secondaryDescription = `a cute fluffy cat named ${companionName || "Misse"}`;
-    if (companionType === 'friend') secondaryDescription = `a close friend named ${companionName || "Lovisa"}`;
+    if (companionType === 'friend') {
+      if (useCustomCompanionAI && companionModelId) {
+        secondaryDescription = `a close friend named ${companionName || "Lovisa"} represented by COMPANIONTOK`;
+      } else {
+        secondaryDescription = `a close friend named ${companionName || "Lovisa"}`;
+      }
+    }
 
     try {
       const response = await fetch('/api/story', {
@@ -235,7 +290,9 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           prompt: newPrompt, 
-          trainedModelId: trainedModelId
+          trainedModelId: trainedModelId,
+          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+          extraLoraScale: 0.8
         }),
       });
       
@@ -279,6 +336,7 @@ export default function Page() {
 
       <div className="w-full max-w-2xl space-y-6">
         
+        {/* STEG 1: BILDUPPLADDNING PRIMÄR KARAKTÄR */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
           <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train Main AI Character</h3>
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
@@ -313,6 +371,7 @@ export default function Page() {
           </div>
         </div>
 
+        {/* HYBRID VÄLJARE FÖR FÖLJESLAGARE */}
         <div className={`rounded-[2rem] border-4 border-dashed border-blue-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-1">🐕 Lägg till en kompis eller ett husdjur</h3>
           <p className="text-xs text-gray-500 mb-4">Vem vill du ska följa med på äventyret?</p>
@@ -326,7 +385,7 @@ export default function Page() {
             ].map((opt) => (
               <button
                 key={opt.type}
-                onClick={() => { setCompanionType(opt.type as any); if (opt.type === 'none') setCompanionName(''); }}
+                onClick={() => { setCompanionType(opt.type as any); if (opt.type !== 'friend') { setUseCustomCompanionAI(false); } if (opt.type === 'none') setCompanionName(''); }}
                 className={`flex-1 py-2 px-3 text-sm font-bold rounded-xl border-2 transition ${companionType === opt.type ? 'bg-blue-500 text-white border-blue-600' : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'}`}
               >
                 {opt.label}
@@ -335,13 +394,64 @@ export default function Page() {
           </div>
 
           {companionType !== 'none' && (
-            <input 
-              type="text" 
-              placeholder={`Vad heter din ${companionType === 'dog' ? 'hund' : companionType === 'cat' ? 'katt' : 'kompis'}?`}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-gray-800"
-              value={companionName}
-              onChange={(e) => setCompanionName(e.target.value)}
-            />
+            <div className="space-y-4">
+              <input 
+                type="text" 
+                placeholder={`Vad heter din ${companionType === 'dog' ? 'hund' : companionType === 'cat' ? 'katt' : 'kompis'}?`}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-gray-800"
+                value={companionName}
+                onChange={(e) => setCompanionName(e.target.value)}
+              />
+
+              {/* UNIK FUNKTION: ANPASSAD AI FÖR KOMPIS */}
+              {companionType === 'friend' && (
+                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="rounded text-blue-500 focus:ring-blue-400"
+                      checked={useCustomCompanionAI}
+                      onChange={(e) => setUseCustomCompanionAI(e.target.checked)}
+                    />
+                    <span className="text-sm font-bold text-blue-900">Anpassa AI-ansikte för {companionName || "kompisen"}? (Kräver foton)</span>
+                  </label>
+
+                  {useCustomCompanionAI && (
+                    <div className="space-y-3 pt-2 border-t border-blue-100/50">
+                      <p className="text-xs text-gray-500">Ladda upp 5-15 bilder på {companionName || "kompisen"} för att få perfekt ansiktslikhet!</p>
+                      <input type="file" multiple ref={companionFileInputRef} onChange={handleCompanionFileSelection} className="hidden" accept="image/*" />
+                      
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => companionFileInputRef.current?.click()} disabled={isTrainingCompanion || companionModelId !== null} className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded-lg text-xs transition disabled:opacity-50">
+                          Välj foton på {companionName || "kompisen"}
+                        </button>
+                        {companionFiles.length > 0 && (
+                          <span className="text-xs text-gray-600 font-medium">{companionFiles.length} foton valda</span>
+                        )}
+                      </div>
+
+                      {companionFiles.length >= 5 && !companionModelId && (
+                        <button onClick={handleStartCompanionTraining} disabled={isTrainingCompanion} className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition disabled:opacity-50">
+                          {isTrainingCompanion ? 'Tränar...' : `🚀 Starta AI-träning för ${companionName || "kompisen"}`}
+                        </button>
+                      )}
+
+                      {companionTrainingStatus && (
+                        <div className="p-2 bg-white border border-blue-200 text-blue-800 rounded-lg font-mono text-xs">
+                          {companionTrainingStatus}
+                        </div>
+                      )}
+
+                      {companionModelId && (
+                        <button onClick={() => { localStorage.removeItem('my_saved_companion_lora_model'); setCompanionModelId(null); setCompanionTrainingStatus(''); setCompanionFiles([]); }} className="text-[10px] text-red-500 hover:underline block">
+                          🗑️ Ta bort sparad AI för {companionName || "kompisen"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

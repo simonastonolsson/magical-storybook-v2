@@ -19,6 +19,10 @@ export default function Page() {
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
 
+  // NYA STATER FÖR PANEL-OMPROMPTNING
+  const [customPrompts, setCustomPrompts] = useState<Record<number, string>>({});
+  const [panelsLoading, setPanelsLoading] = useState<Record<number, boolean>>({});
+
   useEffect(() => {
     const savedModel = localStorage.getItem('my_saved_lora_model');
     if (savedModel && savedModel.includes('/')) {
@@ -198,6 +202,65 @@ export default function Page() {
     }
   };
 
+  // NY NYCKELFUNKTION FÖR ATT UPPDATERA EN ENKILDA RUTA
+  const handleRegeneratePanel = async (panelNumber: number, originalPrompt: string) => {
+    const instruction = customPrompts[panelNumber];
+    if (!instruction || !instruction.trim() || !trainedModelId) return;
+
+    setPanelsLoading(prev => ({ ...prev, [panelNumber]: true }));
+    try {
+      // 1. Skicka till Gemini för att justera prompten på engelska
+      const refineRes = await fetch('/api/refine-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalPrompt, instruction }),
+      });
+      if (!refineRes.ok) throw new Error("Failed to refine prompt");
+      const refineData = await refineRes.json();
+      const newPrompt = refineData.refinedPrompt;
+
+      console.log(`Ny raffinerad prompt för panel ${panelNumber}: ${newPrompt}`);
+
+      // 2. Skapa den nya bilden med Replicate
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt: newPrompt, 
+          trainedModelId: trainedModelId 
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Ersätt bara den specifika bilden på skärmen
+        setGeneratedImages(prev => ({...prev, [panelNumber]: data.imageUrl}));
+        
+        // Spara den nya prompten i manuset ifall användaren vill ändra igen
+        setComic((prevComic: any) => {
+          if (!prevComic) return prevComic;
+          const updatedPanels = prevComic.panels.map((p: any) => {
+            if (p.panel_number === panelNumber) {
+              return { ...p, image_prompt: newPrompt };
+            }
+            return p;
+          });
+          return { ...prevComic, panels: updatedPanels };
+        });
+
+        // Töm textrutan
+        setCustomPrompts(prev => ({ ...prev, [panelNumber]: '' }));
+      } else {
+        alert("Något gick snett när bilden skulle ritas om.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Det gick inte att uppdatera bilden.");
+    } finally {
+      setPanelsLoading(prev => ({ ...prev, [panelNumber]: false }));
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50 font-sans">
       <div className="mb-12 max-w-3xl mt-10">
@@ -266,14 +329,39 @@ export default function Page() {
                     <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="p-4 flex flex-col items-center justify-center text-center">
-                      <span className="text-gray-400 text-5xl mb-2">{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
-                      <span className="text-xs text-gray-500 font-mono">{currentlyGeneratingPanel === panel.panel_number ? 'AI is drawing...' : 'In queue...'}</span>
+                      <span className="text-gray-400 text-5xl mb-2">
+                        {currentlyGeneratingPanel === panel.panel_number || panelsLoading[panel.panel_number] ? '🎨' : '⏳'}
+                      </span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        {currentlyGeneratingPanel === panel.panel_number || panelsLoading[panel.panel_number] ? 'AI is drawing...' : 'In queue...'}
+                      </span>
                     </div>
                   )}
                   <div className="absolute top-2 left-2 bg-yellow-400 text-black font-black w-8 h-8 flex items-center justify-center rounded-full border-2 border-black z-10">{panel.panel_number}</div>
                 </div>
-                <div className="p-4 bg-yellow-50 min-h-[100px] flex items-center">
-                  <p className="text-gray-800 font-medium text-lg leading-relaxed">{panel.narration}</p>
+                <div className="p-4 bg-yellow-50 min-h-[100px] flex flex-col justify-between">
+                  <p className="text-gray-800 font-medium text-lg leading-relaxed mb-4">{panel.narration}</p>
+                  
+                  {/* REGENERATION GRÄNSSNITT */}
+                  {generatedImages[panel.panel_number] && (
+                    <div className="mt-2 flex gap-2 pt-4 border-t border-yellow-200/50">
+                      <input
+                        type="text"
+                        placeholder="Ändra något (t.ex. 'gul jacka')..."
+                        className="flex-1 px-3 py-2 text-sm bg-white/80 border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-gray-800"
+                        value={customPrompts[panel.panel_number] || ''}
+                        onChange={(e) => setCustomPrompts(prev => ({ ...prev, [panel.panel_number]: e.target.value }))}
+                        disabled={panelsLoading[panel.panel_number]}
+                      />
+                      <button
+                        onClick={() => handleRegeneratePanel(panel.panel_number, panel.image_prompt)}
+                        disabled={panelsLoading[panel.panel_number] || !customPrompts[panel.panel_number]?.trim()}
+                        className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition disabled:opacity-50"
+                      >
+                        {panelsLoading[panel.panel_number] ? 'Ritar...' : 'Uppdatera'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

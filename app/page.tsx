@@ -14,6 +14,11 @@ export default function Page() {
   const [trainingStatus, setTrainingStatus] = useState('');
   const [trainedModelId, setTrainedModelId] = useState<string | null>(null);
 
+  // DYNAMISKA KARAKTÄRSINSTÄLLNINGAR
+  const [charName, setCharacterName] = useState('Simon');
+  const [charDesc, setCharacterDescription] = useState('an adult man');
+  const [charTrigger, setCharacterTrigger] = useState('TOK');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // BILD-GENERERING STATE
@@ -121,7 +126,7 @@ export default function Page() {
     const trainRes = await fetch('/api/train-model', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zipUrl: rawZipUrl, triggerWord: triggerWord }), // SKICKAR MED UNIKT TRIGGERORD!
+      body: JSON.stringify({ zipUrl: rawZipUrl, triggerWord: triggerWord }),
     });
     
     if (!trainRes.ok) throw new Error('Failed to start training');
@@ -158,7 +163,7 @@ export default function Page() {
     }
     setIsTraining(true);
     try {
-      const path = await startTrainingJob(selectedFiles, setTrainingStatus, 'TOK');
+      const path = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger);
       setTrainedModelId(path);
       localStorage.setItem('my_saved_lora_model', path);
       setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
@@ -177,7 +182,6 @@ export default function Page() {
     }
     setIsTrainingCompanion(true);
     try {
-      // HÄR SÄTTER VI DET UNIKA TRIGGERORDET 'COMPANIONTOK' FÖR KOMPISEN!
       const path = await startTrainingJob(companionFiles, setCompanionTrainingStatus, 'COMPANIONTOK');
       setCompanionModelId(path);
       localStorage.setItem('my_saved_companion_lora_model', path);
@@ -238,9 +242,9 @@ export default function Page() {
     if (companionType === 'cat') secondaryDescription = `a cute fluffy cat named ${companionName || "Misse"}`;
     if (companionType === 'friend') {
       if (useCustomCompanionAI && companionModelId) {
-        secondaryDescription = `a close friend named ${companionName || "Lovisa"} represented by COMPANIONTOK`;
+        secondaryDescription = `a close friend named ${companionName || "Lovisa"} represented by COMPANIONTOK, an adult man`;
       } else {
-        secondaryDescription = `a close friend named ${companionName || "Lovisa"}`;
+        secondaryDescription = `a close friend named ${companionName || "Lovisa"}, an adult man`;
       }
     }
 
@@ -250,6 +254,9 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           prompt: memory,
+          characterName: charName,
+          characterTrigger: charTrigger,
+          characterDescription: charDesc,
           secondaryName: companionName || null,
           secondaryTrigger: secondaryDescription || null
         }),
@@ -337,12 +344,50 @@ export default function Page() {
 
       <div className="w-full max-w-2xl space-y-6">
         
-        {/* STEG 1: BILDUPPLADDNING PRIMÄR KARAKTÄR */}
-        <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left">
+        {/* STEG 1: BILDUPPLADDNING OCH DYNAMISKA INSTÄLLNINGAR */}
+        <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left space-y-4">
           <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train Main AI Character</h3>
+          
+          {/* NYTT DYNAMISKT GRÄNSSNITT */}
+          <div className="grid grid-cols-3 gap-3 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+            <div>
+              <label className="block text-xs font-bold text-purple-900 mb-1">Namn</label>
+              <input 
+                type="text" 
+                className="w-full px-3 py-2 text-sm bg-white border border-purple-200 rounded-lg text-gray-800 focus:outline-none"
+                value={charName}
+                onChange={(e) => setCharacterName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-purple-900 mb-1">Typ / Ålder / Kön</label>
+              <select 
+                className="w-full px-3 py-2 text-sm bg-white border border-purple-200 rounded-lg text-gray-800 focus:outline-none"
+                value={charDesc}
+                onChange={(e) => setCharacterDescription(e.target.value)}
+              >
+                <option value="an adult man">Vuxen Man 👤</option>
+                <option value="an adult woman">Vuxen Kvinna 👩</option>
+                <option value="a young boy">Ung Pojke 👦</option>
+                <option value="a young girl">Ung Flicka 👧</option>
+                <option value="a friendly dog">Hund 🐶</option>
+                <option value="a cute fluffy cat">Katt 🐱</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-purple-900 mb-1">Triggerord</label>
+              <input 
+                type="text" 
+                className="w-full px-3 py-2 text-sm bg-white border border-purple-200 rounded-lg text-gray-800 focus:outline-none"
+                value={charTrigger}
+                onChange={(e) => setCharacterTrigger(e.target.value)}
+              />
+            </div>
+          </div>
+
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
           
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 pt-2">
             <div className="flex items-center gap-4">
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
                 Choose Photos

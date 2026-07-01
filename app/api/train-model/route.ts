@@ -13,21 +13,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing zipUrl' }, { status: 400 });
     }
 
-    // Vi sätter triggerordet till det som skickas med, eller defaultar till 'TOK'
     const targetTriggerWord = triggerWord || 'TOK';
     console.log(`Startar träning med triggerord: ${targetTriggerWord}`);
 
-    // Vi startar träningen på Replicate
     const training = await replicate.trainings.create(
       'ostris',
       'flux-dev-lora-trainer',
-      'e440909d0e909437e8c4e47de3064d46c30504ae376c75bef6a9022d2', // Flux Dev Trainer verson
+      '26dce37af90b9d997eeb970d92e47de3064d46c30504ae376c75bef6a9022d2', // HÄR ÄR DEN RIKTIGA VERSIONEN!
       {
         destination: `simonastonolsson/comic-hero-${Date.now()}`,
         input: {
           input_images: zipUrl,
           steps: 1000,
-          trigger_word: targetTriggerWord, // HÄR ÄR NYCKELN: Vi sätter det unika triggerordet!
+          trigger_word: targetTriggerWord,
           autocrop: true
         },
       }

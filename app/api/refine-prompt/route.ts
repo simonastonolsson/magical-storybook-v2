@@ -22,10 +22,10 @@ export async function POST(req: Request) {
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
       result = await model.generateContent(prompt);
     } catch (primaryError) {
-      console.warn("gemini-2.5-flash överbelastad under om-promptning, faller tillbaka på gemini-1.5-flash...");
+      console.warn("gemini-2.5-flash överbelastad under om-promptning, faller tillbaka på gemini-2.5-flash-lite...");
       
-      // Fallback till den extremt driftsäkra gemini-1.5-flash
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Fallback till den stensäkra gemini-2.5-flash-lite
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
       result = await fallbackModel.generateContent(prompt);
     }
     

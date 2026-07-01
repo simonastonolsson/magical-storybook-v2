@@ -19,7 +19,6 @@ export default function Page() {
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
 
-  // NYA STATER FÖR PANEL-OMPROMPTNING
   const [customPrompts, setCustomPrompts] = useState<Record<number, string>>({});
   const [panelsLoading, setPanelsLoading] = useState<Record<number, boolean>>({});
 
@@ -202,14 +201,12 @@ export default function Page() {
     }
   };
 
-  // NY NYCKELFUNKTION FÖR ATT UPPDATERA EN ENKILDA RUTA
   const handleRegeneratePanel = async (panelNumber: number, originalPrompt: string) => {
     const instruction = customPrompts[panelNumber];
     if (!instruction || !instruction.trim() || !trainedModelId) return;
 
     setPanelsLoading(prev => ({ ...prev, [panelNumber]: true }));
     try {
-      // 1. Skicka till Gemini för att justera prompten på engelska
       const refineRes = await fetch('/api/refine-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -221,7 +218,6 @@ export default function Page() {
 
       console.log(`Ny raffinerad prompt för panel ${panelNumber}: ${newPrompt}`);
 
-      // 2. Skapa den nya bilden med Replicate
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,10 +229,8 @@ export default function Page() {
       
       if (response.ok) {
         const data = await response.json();
-        // Ersätt bara den specifika bilden på skärmen
         setGeneratedImages(prev => ({...prev, [panelNumber]: data.imageUrl}));
         
-        // Spara den nya prompten i manuset ifall användaren vill ändra igen
         setComic((prevComic: any) => {
           if (!prevComic) return prevComic;
           const updatedPanels = prevComic.panels.map((p: any) => {
@@ -248,7 +242,6 @@ export default function Page() {
           return { ...prevComic, panels: updatedPanels };
         });
 
-        // Töm textrutan
         setCustomPrompts(prev => ({ ...prev, [panelNumber]: '' }));
       } else {
         alert("Något gick snett när bilden skulle ritas om.");
@@ -342,12 +335,11 @@ export default function Page() {
                 <div className="p-4 bg-yellow-50 min-h-[100px] flex flex-col justify-between">
                   <p className="text-gray-800 font-medium text-lg leading-relaxed mb-4">{panel.narration}</p>
                   
-                  {/* REGENERATION GRÄNSSNITT */}
                   {generatedImages[panel.panel_number] && (
                     <div className="mt-2 flex gap-2 pt-4 border-t border-yellow-200/50">
                       <input
                         type="text"
-                        placeholder="Ändra något (t.ex. 'gul jacka')..."
+                        placeholder="Ändra något med denna bild"
                         className="flex-1 px-3 py-2 text-sm bg-white/80 border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-gray-800"
                         value={customPrompts[panel.panel_number] || ''}
                         onChange={(e) => setCustomPrompts(prev => ({ ...prev, [panel.panel_number]: e.target.value }))}

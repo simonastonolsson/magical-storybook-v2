@@ -13,20 +13,21 @@ export async function POST(req: Request) {
     });
 
     const fullPrompt = `You are an expert comic book director. The user's idea is: "${prompt}".
-      First, identify the main character's name and their apparent gender (e.g., "man", "woman", "boy", "girl").
-      Then, create a comic script with 4-5 panels.
+      First, identify the main character's name.
+      Then, determine if the character is a "man" or "woman". 
+      CRITICAL AGE RULE: Since the AI models are trained on adults, you MUST always default to "man" or "woman" (adult). NEVER use "boy", "girl", "child", or "kid" unless the user's prompt explicitly states they are a child.
 
       CRITICAL RULES:
       1. "title" & "narration": Use the character's REAL NAME. Write narration in the SAME LANGUAGE as the user's prompt.
       2. "image_prompt": Write in ENGLISH.
-         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, a [GENDER], " (Replace [GENDER] with the gender you identified, e.g. "a man" or "a woman").
-         - CRITICAL ISOLATION RULE: NEVER include other human characters in the image_prompt (e.g., do not write "talking to a waiter" or "crowd of people"). If the story has other people, keep them in the narration text ONLY. The image_prompt must focus 100% on TOK to avoid AI confusion.
-         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple.
+         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, a [GENDER], " (Replace [GENDER] with "man" or "woman" based on your identification).
+         - CRITICAL ISOLATION RULE: NEVER include other human characters in the image_prompt. Focus 100% on TOK to avoid AI confusion.
+         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple (smiling, neutral, determined).
          
       Return ONLY a JSON object:
       {
         "title": "Title",
-        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, a man, wearing a blue jacket, medium shot..." }]
+        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, a man, wearing a jacket, medium shot..." }]
       }`;
 
     const result = await model.generateContent(fullPrompt);

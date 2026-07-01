@@ -7,41 +7,57 @@ export async function POST(req: Request) {
     if (!apiKey) return new Response(JSON.stringify({ error: "API key missing" }), { status: 500 });
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash", 
-      generationConfig: { responseMimeType: "application/json" }
-    });
-
-    // Vi berättar för Gemini om den extra karaktären finns med
-    const secondaryInfo = secondaryName && secondaryTrigger 
-      ? `There is also an optional secondary character: Name is "${secondaryName}", English trigger word is "${secondaryTrigger}".`
-      : "";
+    
+    const companionInstruction = secondaryName && secondaryTrigger
+      ? `There is also a companion in the story: ${secondaryTrigger}. You must include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (describing them naturally, e.g. "standing with a golden retriever dog" or "hugging a cat").`
+      : "There are no other main companions in this story.";
 
     const fullPrompt = `You are an expert comic book director. The user's idea is: "${prompt}".
       
       Primary character name: Simon (English trigger word is "TOK").
-      ${secondaryInfo}
+      ${companionInstruction}
 
       CRITICAL ANCHOR ANALYSIS:
-      1. Portray Simon as a fully grown adult man ("an adult man") unless the prompt explicitly says otherwise.
-      2. If a secondary character is provided, identify if they are a man, woman, dog, etc.
+      1. Identify the main character's name.
+      2. STRICT DEFAULT TO ADULT RULE: You must default to portraying Simon as a fully grown adult man (around 30 years old, using "an adult man").
+      3. Only use child descriptions if the user's prompt explicitly states they are a child (e.g. using words like "barn", "liten", "6 år").
+      4. If the name is "Simon", he is ALWAYS a 30-year-old adult man. Do NOT make him a child even if "pappa" or "father" is mentioned in the prompt.
+      5. If the user mentions "pappa" or "mamma", do NOT make Simon a child. Portray them as two adults (e.g., "Simon and his father Thomas, both adult men").
 
       CRITICAL RULES:
-      1. "title" & "narration": Use the characters' REAL NAMES (Simon and ${secondaryName || ''}) in the narration. Write narration in the SAME LANGUAGE as the user's prompt.
+      1. "title" & "narration": Use the characters' REAL NAMES (Simon and others) in the narration. Write narration in the SAME LANGUAGE as the user's prompt.
       2. "image_prompt": Write in ENGLISH.
-         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, "
-         - MULTI-CHARACTER RULE: If the story involves both characters in a scene, you MUST include both of their trigger words in the image_prompt (e.g., "drawing of TOK, an adult man, standing next to ${secondaryTrigger || ''}, a friendly dog, " or "drawing of TOK and ${secondaryTrigger || ''} sitting together").
-         - CRITICAL ISOLATION RULE: NEVER include any other human characters except TOK and ${secondaryTrigger || 'none'}.
-         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple.
+         - Comic book style: The style must be consistent graphic novel art.
+         - CRITICAL ANCHOR RULE: Every single image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, " 
+         - MULTI-CHARACTER RULE: If a companion is active (${secondaryName || 'none'}), you MUST describe them naturally in the image_prompt (e.g., "drawing of TOK, an adult man, standing with a golden retriever dog, on an airplane").
+         - CRITICAL ISOLATION RULE: NEVER include other human characters in the image_prompt except Simon and the specified companion. Focus on the main characters to avoid AI confusion.
+         - CRITICAL CAMERA RULE: Vary the camera angles freely (close-ups, medium shots, wide shots). Keep facial expressions simple (smiling, neutral, determined).
          
       Return ONLY a JSON object:
       {
         "title": "Title",
-        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, standing with ${secondaryTrigger || 'his pet'}..." }]
+        "panels": [{ "panel_number": 1, "narration": "Text...", "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, standing with a golden retriever, medium shot..." }]
       }`;
 
-    const result = await model.generateContent(fullPrompt);
-    
+    let result;
+    try {
+      // Försök först med gemini-2.5-flash
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash", 
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      result = await model.generateContent(fullPrompt);
+    } catch (primaryError) {
+      console.warn("gemini-2.5-flash är överbelastad (503), testar stabil fallback gemini-1.5-flash...");
+      
+      // Fallback till den extremt driftsäkra gemini-1.5-flash
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      result = await fallbackModel.generateContent(fullPrompt);
+    }
+
     let text = result.response.text();
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     text = text.replace(/\/\/.*$/gm, "");

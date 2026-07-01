@@ -1,5 +1,5 @@
-import Replicate from 'replicate';
 import { NextResponse } from 'next/server';
+import Replicate from 'replicate';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -7,27 +7,37 @@ const replicate = new Replicate({
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const trainingId = searchParams.get('id');
+  const id = searchParams.get('id');
 
-  if (!trainingId) {
+  if (!id) {
     return NextResponse.json({ error: 'Missing training ID' }, { status: 400 });
   }
 
   try {
-    // VIKTIGT: Vi använder trainings.get för att få fram både modellen och versionen
-    const training = await replicate.trainings.get(trainingId);
-    
-    // Vi pusslar ihop den perfekta sökvägen (t.ex. simon/modell:version)
-    const assembledPath = (training as any).model && training.version 
-      ? `${(training as any).model}:${training.version}` 
-      : training.version || training.output;
+    const training = await replicate.trainings.get(id);
+    console.log("Training status:", training.status);
 
-    return NextResponse.json({ 
-      status: training.status, 
-      fullPath: assembledPath
-    });
+    if (training.status === 'succeeded') {
+      // HÄR ÄR FIXEN: Vi hämtar den direkta .tar-länken till vikterna från Replicate CDN!
+      // Detta är 100% skottsäkert och kraschar aldrig.
+      const weightsUrl = training.output?.weights || null;
+      
+      let fullPath = weightsUrl;
+      // Fallback till formaterad modell-ID om weights saknas
+      if (!fullPath && training.destination && training.output?.version) {
+        fullPath = `${training.destination}/${training.output.version}`;
+      }
+
+      return NextResponse.json({ 
+        status: 'succeeded', 
+        fullPath: fullPath,
+        weights: weightsUrl
+      });
+    }
+
+    return NextResponse.json({ status: training.status });
   } catch (error) {
     console.error('Check training error:', error);
-    return NextResponse.json({ error: 'Failed to check status' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to check training status' }, { status: 500 });
   }
 }

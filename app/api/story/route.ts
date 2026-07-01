@@ -2,23 +2,34 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: Request) {
   try {
-    const { prompt, secondaryName, secondaryTrigger } = await req.json();
+    const { 
+      prompt, 
+      characterName, 
+      characterTrigger, 
+      characterDescription, // t.ex. "an adult man", "a young girl"
+      secondaryName, 
+      secondaryTrigger 
+    } = await req.json();
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return new Response(JSON.stringify({ error: "API key missing" }), { status: 500 });
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Vi bestämmer inställningarna för din följeslagare (t.ex. Baran)
-    const hasCompanion = !!(secondaryName && secondaryTrigger);
-    const companionInfo = hasCompanion
-      ? `Companion's Name: "${secondaryName}". Companion's Trigger Word: "COMPANIONTOK". Companion's Description: "${secondaryTrigger}".`
-      : "No companion is selected.";
+    // Vi sätter säkra standardvärden om fälten mot förmodan skulle saknas
+    const name = characterName || "Simon";
+    const trigger = characterTrigger || "TOK";
+    const desc = characterDescription || "an adult man";
+
+    const companionInstruction = secondaryName && secondaryTrigger
+      ? `There is also a companion in the story: ${secondaryTrigger}. You must include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (describing them naturally, e.g. "standing with a golden retriever dog" or "hugging a cat").`
+      : "There are no other main companions in this story.";
 
     const fullPrompt = `You are an expert comic book director. Create a comic book script based on the user's idea: "${prompt}".
       
-      CHARACTERS:
-      - Main Character: Simon (Trigger Word: "TOK", Description: "an adult man"). Simon is ALWAYS a 30-year-old adult man.
-      - ${companionInfo}
+      CHARACTERS TO PORTRAY:
+      - Main Character: Name is "${name}". Trigger Word is "${trigger}". Appearance is "${desc}".
+      - ${companionInstruction}
 
       DIRECTOR RULES FOR WRITING:
       1. Create exactly 4 panels, numbered strictly 1, 2, 3, 4. (NEVER skip panel 1).
@@ -27,11 +38,11 @@ export async function POST(req: Request) {
 
       CRITICAL IMAGE_PROMPT RULES (Write in English, consistent graphic novel style):
       1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
-      2. Carefully decide who is in each scene and use the correct trigger words:
-         - If Simon (TOK) is in the scene: include "drawing of TOK, an adult man".
-         - If the companion (COMPANIONTOK) is in the scene: include "drawing of COMPANIONTOK, an adult man" (or the appropriate description like "drawing of COMPANIONTOK, a friendly golden retriever dog").
-         - If BOTH Simon and the companion are in the scene: include "drawing of TOK, an adult man, and COMPANIONTOK, [COMPANION_DESCRIPTION]" together in the prompt so they appear in the same image.
-         - If the scene is about a baby, or something else without Simon or the companion, describe it naturally (e.g., "drawing of a cute little baby wrapped in a blanket") and DO NOT include "TOK" or "COMPANIONTOK" in that prompt.
+      2. You MUST use the correct trigger words and descriptions for who is actually in each scene:
+         - If the main character (${name}) is in the scene: include "drawing of ${trigger}, ${desc}".
+         - If the companion (${secondaryName || 'none'}) is in the scene: include "drawing of COMPANIONTOK" (or describe them based on their description).
+         - If BOTH are in the scene: describe them interacting in the same image (e.g., "drawing of ${trigger}, ${desc}, and COMPANIONTOK, standing together").
+         - If the scene is about a baby, an object, or something else where the main characters are not present: describe it naturally (e.g., "drawing of a cute little baby wrapped in a blanket") and DO NOT include "${trigger}" or "COMPANIONTOK" in that prompt.
       3. Keep the scene composition simple and focused on the characters. Do not add other random people.
          
       Return ONLY a JSON object with this exact structure:
@@ -41,7 +52,7 @@ export async function POST(req: Request) {
           {
             "panel_number": 1,
             "narration": "Narration text in the prompt's language...",
-            "image_prompt": "Comic book panel illustration, graphic novel art, drawing of TOK, an adult man, and COMPANIONTOK, an adult man, standing together..."
+            "image_prompt": "Comic book panel illustration, graphic novel art, drawing of ${trigger}, ${desc}, doing something..."
           }
         ]
       }`;

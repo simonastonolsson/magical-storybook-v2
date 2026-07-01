@@ -14,18 +14,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    // FIXEN: Vi tvingar TypeScript att tolka svaret som "any" för att slippa rigid typkontroll vid bygget
     const training = (await replicate.trainings.get(id)) as any;
     console.log("Training status:", training.status);
 
     if (training.status === 'succeeded') {
-      // HÄR ÄR FIXEN: Vi hämtar den direkta .tar-länken till vikterna från Replicate CDN!
       const weightsUrl = training.output?.weights || null;
       
-      let fullPath = weightsUrl;
-      // Fallback till formaterad modell-ID om weights saknas
-      if (!fullPath && training.destination && training.output?.version) {
-        fullPath = `${training.destination}/${training.output.version}`;
+      let fullPath = null;
+      // FIXEN: Vi sparar i det officiella formatet med kolon (owner/model:version)
+      if (training.destination && training.output?.version) {
+        fullPath = `${training.destination}:${training.output.version}`;
+      } else {
+        fullPath = weightsUrl;
       }
 
       return NextResponse.json({ 

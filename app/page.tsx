@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
-import { jsPDF } from 'jspdf'; // HÄR IMPORTERAR VI PDF-MOTORN!
 
 export default function Page() {
   const [memory, setMemory] = useState('');
@@ -41,9 +40,6 @@ export default function Page() {
   const [companionTrainingStatus, setCompanionTrainingStatus] = useState('');
   const [companionModelId, setCompanionModelId] = useState<string | null>(null);
   const companionFileInputRef = useRef<HTMLInputElement>(null);
-
-  // PDF-GENERATOR STATE
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Generera unikt triggerord baserat på namn
   useEffect(() => {
@@ -228,4 +224,29 @@ export default function Page() {
         });
         
         if (response.ok) {
-          const
+          const data = await response.json();
+          setGeneratedImages(prev => ({...prev, [panel.panel_number]: data.imageUrl}));
+        }
+      } catch (err) {
+        console.error(`Failed to generate image`, err);
+      }
+      setCurrentlyGeneratingPanel(null);
+    }
+    setIsGeneratingImages(false);
+  };
+
+  const handleCreateStory = async () => {
+    if (!memory.trim()) {
+      alert("Beskriv ett äventyr först!");
+      return;
+    }
+    setIsLoadingScript(true);
+    setComic(null);
+    setGeneratedImages({});
+
+    let secondaryDescription = "";
+    const companionTriggerWord = `${companionName.replace(/[^a-zA-Z]/g, "").toUpperCase()}TOK`;
+    
+    if (companionType === 'dog') secondaryDescription = `a friendly golden retriever dog named ${companionName || "Aston"}`;
+    if (companionType === 'cat') secondaryDescription = `a cute fluffy cat named ${companionName || "Misse"}`;
+    if (companionType

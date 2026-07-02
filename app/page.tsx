@@ -209,9 +209,7 @@ export default function Page() {
       const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
 
-      // PROAKTIV BUSINESS-INSTÄLLNING: 
-      // Vi sänker fördröjningen till endast 2 sekunder så att sagan laddar blixtsnabbt!
-      if (i > 0) await delay(2000); 
+      if (i > 0) await delay(10000); 
 
       try {
         const response = await fetch('/api/generate-image', {
@@ -519,10 +517,10 @@ export default function Page() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {comic.panels.map((panel: any) => (
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
-                {/* UPPDATERAT: ASPECT ratio till 4:3 för att förhindra inzoomning i webbläsaren! */}
+                {/* UPPDATERAT: ÄNDRAT FRÅN object-cover TILL object-top FÖR ATT ALDRIG KLIPPA BORT ERA HUVUDEN! */}
                 <div className="bg-gray-200 w-full aspect-[4/3] flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
-                    <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
+                    <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover object-top" />
                   ) : (
                     <div className="p-4 flex flex-col items-center justify-center text-center">
                       <span className="text-gray-400 text-5xl mb-2">

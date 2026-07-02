@@ -23,18 +23,19 @@ export async function POST(request: Request) {
       num_inference_steps: 28, 
       guidance_scale: 3.5,     
       
-      // HÄR ÄR FIXEN: Vi skickar din .tar-länk direkt till den officiella LoRA-motorn!
+      // Vi sätter din .tar-länk som primära vikter
       lora_weights: trainedModelId,
-      lora_scale: 1.0 
+      
+      // NYCKELN: Sänkt från 1.0 till 0.8 för att ge plats åt din kropp och bakgrunden!
+      lora_scale: 0.8 
     };
 
-    // Om Baran är med skickar vi hans .tar-länk som extra_lora direkt
+    // Om kompisen Baran är med sätter vi hans lora_scale till samma stabila 0.8
     if (extraLoraId) {
       input.extra_lora = extraLoraId;
       input.extra_lora_scale = extraLoraScale || 0.8;
     }
 
-    // Vi kör den officiella och extremt stabila LoRA-motorn hos Replicate!
     const output = await replicate.run(
       "black-forest-labs/flux-dev-lora", 
       { input }

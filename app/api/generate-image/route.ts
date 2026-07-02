@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
+  useFileOutput: false 
 } as any);
 
 export async function POST(request: Request) {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
     }
 
-    console.log(`Skapar LoRA-bild för prompt: ${prompt}`);
+    console.log(`Skapar stabil Flux LoRA-bild för prompt: ${prompt}`);
 
     const input: any = {
       prompt: prompt,
@@ -21,27 +22,39 @@ export async function POST(request: Request) {
       height: 768,
       num_inference_steps: 28, 
       guidance_scale: 3.5,     
+      
+      // HÄR ÄR FIXEN: Vi skickar din .tar-länk direkt till den officiella LoRA-motorn!
+      lora_weights: trainedModelId,
       lora_scale: 1.0 
     };
 
-    // Koppla på den sekundära LoRA-modellen (t.ex. Baran) om den är aktiv
+    // Om Baran är med skickar vi hans .tar-länk som extra_lora direkt
     if (extraLoraId) {
-      let formattedLora = extraLoraId;
-      if (formattedLora.includes(':') && !formattedLora.startsWith('http')) {
-        formattedLora = formattedLora.replace(':', '/');
-      }
-      input.extra_lora = formattedLora;
+      input.extra_lora = extraLoraId;
       input.extra_lora_scale = extraLoraScale || 0.8;
     }
 
+    // Vi kör den officiella och extremt stabila LoRA-motorn hos Replicate!
     const output = await replicate.run(
-      trainedModelId as `${string}/${string}:${string}`, 
+      "black-forest-labs/flux-dev-lora", 
       { input }
     );
 
-    const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
+    let finalImageUrl = "";
+    if (typeof output === 'string') {
+      finalImageUrl = output;
+    } else if (Array.isArray(output) && output.length > 0) {
+      const first = output[0];
+      finalImageUrl = typeof first === 'string' ? first : (first?.url || first?.toString() || "");
+    } else if (output && typeof output === 'object') {
+      finalImageUrl = (output as any).url || output.toString() || "";
+    }
 
-    if (!finalImageUrl) return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
+    console.log(`Hittade bildlänk: ${finalImageUrl}`);
+
+    if (!finalImageUrl || finalImageUrl.includes('[object')) {
+      return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
+    }
 
     return NextResponse.json({ imageUrl: finalImageUrl });
 

@@ -209,7 +209,9 @@ export default function Page() {
       const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
 
-      if (i > 0) await delay(10000); 
+      // PROAKTIV BUSINESS-INSTÄLLNING: 
+      // Vi sänker fördröjningen till endast 2 sekunder så att sagan laddar blixtsnabbt!
+      if (i > 0) await delay(2000); 
 
       try {
         const response = await fetch('/api/generate-image', {

@@ -19,7 +19,6 @@ export async function POST(request: Request) {
     const modelName = `comic-hero-${Date.now()}`;
     
     try {
-      // FIXEN: Vi skickar de tre separata argumenten och castar till "any" för att garantera ett grönt bygge!
       await (replicate.models as any).create(
         'simonastonolsson',
         modelName,
@@ -43,7 +42,11 @@ export async function POST(request: Request) {
           input_images: zipUrl,
           steps: 1000,
           trigger_word: targetTriggerWord,
-          autocrop: true
+          
+          // HÄR ÄR DEN MAGISKA LÖSNINGEN:
+          // Vi stänger av autocrop helt! Detta gör att AI:n behåller din naturliga inramning
+          // och lär sig rita dig med perfekt hår, axlar och tillräckligt med luft ovanför huvudet.
+          autocrop: false
         },
       }
     );

@@ -98,14 +98,18 @@ export default function Page() {
       const formData = new FormData();
       formData.append('file', resizedBlob, `reference_${i}.jpg`);
 
-      const uploadRes = await fetch('/api/upload', {
+      // Vi laddar upp direkt till tmpfiles.org för att helt gratis gå förbi Vercels 1GB hobby-gräns!
+      const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', {
         method: 'POST',
         body: formData,
       });
 
       if (!uploadRes.ok) throw new Error(`Kunde inte ladda upp bild ${i + 1}`);
-      const data = await uploadRes.json();
-      urls.push(data.url);
+      const uploadData = await uploadRes.json();
+      
+      // Gör om till en direkt nedladdningslänk som Replicate/Nano Banana kan läsa direkt
+      const directUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+      urls.push(directUrl);
     }
     
     return urls;

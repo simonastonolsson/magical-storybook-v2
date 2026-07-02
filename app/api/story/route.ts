@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Hjälpfunktion för att vänta x millisekunder
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(req: Request) {
@@ -70,9 +69,6 @@ export async function POST(req: Request) {
         ]
       }`;
 
-    // NYCKELN FÖR SKOTTSÄKER DRIFT (Retry på gemini-2.5-flash):
-    // Eftersom gemini-2.5-pro har en stenhård begränsning på 0 requests på Free Tier (429),
-    // och 503 High Demand på Flash nästan alltid är tillfällig, så kör vi automatisk retry på Flash!
     let result;
     const maxRetries = 3;
     let attempt = 0;
@@ -84,14 +80,13 @@ export async function POST(req: Request) {
           generationConfig: { responseMimeType: "application/json" }
         });
         result = await model.generateContent(fullPrompt);
-        break; // Om det lyckas bryter vi loopen direkt!
+        break;
       } catch (error: any) {
         attempt++;
         console.warn(`Attempt ${attempt} failed with error: ${error.message || error}`);
         if (attempt >= maxRetries) {
-          throw error; // Om vi nått maxgränsen kastar vi felet vidare
+          throw error;
         }
-        // Vänta lite längre för varje misslyckat försök (exponential backoff: 1.5s, 3s)
         const waitTime = attempt * 1500;
         console.warn(`Waiting ${waitTime}ms before retry...`);
         await delay(waitTime);
@@ -99,4 +94,22 @@ export async function POST(req: Request) {
     }
 
     if (!result) {
-      throw new Error("Failed
+      throw new Error("Failed to generate story after multiple retries");
+    }
+
+    let text = result.response.text();
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    text = text.replace(/\/\/.*$/gm, "");
+    text = text.replace(/,\s*([\]}])/g, "$1");
+
+    const comicData = JSON.parse(text);
+
+    return new Response(JSON.stringify({ comic: comicData }), {
+      headers: { "Content-Type": "application/json" },
+    });
+
+  } catch (error) {
+    console.error("Story error:", error);
+    return new Response(JSON.stringify({ error: "Failed to generate story" }), { status: 500 });
+  }
+}

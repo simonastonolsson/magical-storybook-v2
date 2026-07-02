@@ -20,9 +20,15 @@ export async function POST(req: Request) {
     const trigger = characterTrigger || "TOK";
     const desc = characterDescription || "an adult man";
 
+    // Skapa en tydlig instruktion för hur referensbilderna är sorterade i listan!
+    // På framsidan skickar vi alltid Simon först (t.ex. bild 0-2) och kompisen sen (t.ex. bild 3-5).
     const companionInstruction = secondaryName && secondaryTrigger
-      ? `There is also a companion in the story: ${secondaryTrigger}. You must include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (describing them naturally, e.g. "standing with a golden retriever dog" or "hugging a cat").`
-      : "There are no other main companions in this story.";
+      ? `There is also a companion in the story: "${secondaryName}".
+         CRITICAL REFERENCE MAPPING:
+         - The main character (${name})'s face is shown in the FIRST 3 images of the reference array.
+         - The companion (${secondaryName})'s face is shown in the NEXT 3 images of the reference array.
+         You MUST explicitly refer to this in the image_prompts so the AI model knows who is who (e.g. "Simon (represented by the first subject in the reference images) and Baran (represented by the second subject in the reference images)...").`
+      : `The main character (${name})'s face is shown in the reference images. Refer to them as "the subject shown in the reference images".`;
 
     const fullPrompt = `You are an expert comic book director. Create a comic book script based on the user's idea: "${prompt}".
       
@@ -37,11 +43,11 @@ export async function POST(req: Request) {
 
       CRITICAL IMAGE_PROMPT RULES (Write in English, consistent graphic novel style):
       1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
-      2. You MUST use the correct trigger words and descriptions for who is actually in each scene:
-         - If the main character (${name}) is in the scene: include "drawing of ${trigger}, ${desc}".
-         - If the companion (${secondaryName || 'none'}) is in the scene: include "drawing of COMPANIONTOK" (or describe them based on their description).
-         - If BOTH are in the scene: describe them interacting in the same image (e.g., "drawing of ${trigger}, ${desc}, and COMPANIONTOK, standing together").
-         - If the scene is about a baby, an object, or something else where the main characters are not present: describe it naturally (e.g., "drawing of a cute little baby wrapped in a blanket") and DO NOT include "${trigger}" or "COMPANIONTOK" in that prompt.
+      2. You MUST use the correct reference pointers for who is actually in each scene:
+         - If only ${name} is in the scene: include "drawing of the first subject in the reference images, ${desc}".
+         - If only the companion (${secondaryName || 'none'}) is in the scene: include "drawing of the second subject in the reference images" (or describe them based on their description).
+         - If BOTH are in the scene: describe them interacting in the same image using the explicit pointers (e.g. "drawing of the first subject in the reference images, ${desc}, and the second subject in the reference images, standing together").
+         - If the scene is about a baby, an object, or something else where the main characters are not present: describe it naturally (e.g., "drawing of a cute little baby wrapped in a blanket") and DO NOT refer to the reference images.
       3. Keep the scene composition simple and focused on the characters. Do not add other random people.
          
       Return ONLY a JSON object with this exact structure:
@@ -51,7 +57,7 @@ export async function POST(req: Request) {
           {
             "panel_number": 1,
             "narration": "Narration text in the prompt's language...",
-            "image_prompt": "Comic book panel illustration, graphic novel art, drawing of ${trigger}, ${desc}, doing something..."
+            "image_prompt": "Comic book panel illustration, graphic novel art, drawing of the first subject in the reference images, ${desc}, doing something..."
           }
         ]
       }`;

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       - ${companionInstruction}
 
       DIRECTOR RULES FOR WRITING:
-      1. Create exactly 4 panels, numbered strictly 1, 2, 3, 4. (NEVER skip panel 1).
+      1. Create exactly 16 panels, numbered strictly 1, 2, 3, ..., 16. (NEVER skip panel 1, and always output exactly 16 panels).
       2. Write "title" and panel "narration" in the SAME LANGUAGE as the user's prompt (Swedish in this case).
       3. Write "image_prompt" in ENGLISH.
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import JSZip from 'jszip';
 
 export default function Page() {
   const [memory, setMemory] = useState('');
@@ -10,14 +9,13 @@ export default function Page() {
   
   // PRIMÄR KARAKTÄR STATE (DIG)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isTraining, setIsTraining] = useState(false);
-  const [trainingStatus, setTrainingStatus] = useState('');
-  const [trainedModelId, setTrainedModelId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [mainImageUrls, setMainImageUrls] = useState<string[]>([]);
 
   // DYNAMISKA KARAKTÄRSINSTÄLLNINGAR
   const [charName, setCharacterName] = useState('Simon');
   const [charDesc, setCharacterDescription] = useState('an adult man');
-  const [charTrigger, setCharacterTrigger] = useState('TOK');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,24 +32,17 @@ export default function Page() {
   const [companionName, setCompanionName] = useState('');
   const [useCustomCompanionAI, setUseCustomCompanionAI] = useState(false);
   
-  // SEKUNDÄR KARAKTÄR AI STATE (KOMPISEN)
+  // SEKUNDÄR KARAKTÄR STATE (KOMPISEN)
   const [companionFiles, setCompanionFiles] = useState<File[]>([]);
-  const [isTrainingCompanion, setIsTrainingCompanion] = useState(false);
-  const [companionTrainingStatus, setCompanionTrainingStatus] = useState('');
-  const [companionModelId, setCompanionModelId] = useState<string | null>(null);
+  const [isUploadingCompanion, setIsUploadingCompanion] = useState(false);
+  const [companionUploadStatus, setCompanionUploadStatus] = useState('');
+  const [companionImageUrls, setCompanionImageUrls] = useState<string[]>([]);
   const companionFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const savedModel = localStorage.getItem('my_saved_lora_model');
-    if (savedModel && savedModel.includes('/')) {
-      setTrainedModelId(savedModel);
-      setTrainingStatus(`🎉 Hittade din sparade AI-modell! Redo att skapa berättelser.`);
-    }
-    const savedCompanionModel = localStorage.getItem('my_saved_companion_lora_model');
-    if (savedCompanionModel && savedCompanionModel.includes('/')) {
-      setCompanionModelId(savedCompanionModel);
-      setCompanionTrainingStatus(`🎉 Hittade sparad AI för kompisen!`);
-    }
+    // Rensar bort gamla LoRA-inställningar från webbläsaren för att undvika konflikter
+    localStorage.removeItem('my_saved_lora_model');
+    localStorage.removeItem('my_saved_companion_lora_model');
   }, []);
 
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,102 +86,64 @@ export default function Page() {
     });
   };
 
-  const startTrainingJob = async (files: File[], onStatusChange: (status: string) => void, triggerWord: string): Promise<string> => {
-    onStatusChange('📦 Optimerar och packar bilderna...');
-    const zip = new JSZip();
+  const uploadImagesToBlob = async (files: File[], onStatusChange: (status: string) => void): Promise<string[]> => {
+    onStatusChange('📦 Optimerar och laddar upp referensbilder...');
+    const urls: string[] = [];
     
     for (let i = 0; i < files.length; i++) {
+      onStatusChange(`☁️ Laddar upp bild ${i + 1} av ${files.length}...`);
       const file = files[i];
       const resizedBlob = await resizeImage(file);
-      zip.file(`image_${i}.jpg`, resizedBlob);
+      
+      const formData = new FormData();
+      formData.append('file', resizedBlob, `reference_${i}.jpg`);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadRes.ok) throw new Error(`Kunde inte ladda upp bild ${i + 1}`);
+      const data = await uploadRes.json();
+      urls.push(data.url);
     }
     
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
-    
-    onStatusChange(`☁️ Laddar upp säkert till molnet (${sizeMB} MB)...`);
-    
-    const formData = new FormData();
-    formData.append('file', zipBlob, 'training_data.zip');
-
-    const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!uploadRes.ok) throw new Error('Failed to upload to temporary storage');
-    const uploadData = await uploadRes.json();
-    const rawZipUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-
-    onStatusChange('🧠 Startar träning hos Replicate... (Detta tar ca 5-10 min)');
-    const trainRes = await fetch('/api/train-model', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zipUrl: rawZipUrl, triggerWord: triggerWord }),
-    });
-    
-    if (!trainRes.ok) throw new Error('Failed to start training');
-    const { trainingId } = await trainRes.json();
-
-    return new Promise((resolve, reject) => {
-      onStatusChange('⏳ AI:n lär sig... Du kan följa framstegen. Stäng inte sidan.');
-      const checkInterval = setInterval(async () => {
-        try {
-          const checkRes = await fetch(`/api/check-training?id=${trainingId}`);
-          const checkData = await checkRes.json();
-
-          if (checkData.status === 'succeeded') {
-            clearInterval(checkInterval);
-            resolve(checkData.fullPath);
-          } else if (checkData.status === 'failed' || checkData.status === 'canceled') {
-            clearInterval(checkInterval);
-            reject(new Error('Training failed or was canceled'));
-          } else {
-            onStatusChange(`⏳ AI:n tränar... (Status: ${checkData.status})`);
-          }
-        } catch (err) {
-          clearInterval(checkInterval);
-          reject(err);
-        }
-      }, 15000);
-    });
+    return urls;
   };
 
-  const handleStartTraining = async () => {
-    if (selectedFiles.length < 5) {
-      alert("Ladda upp minst 5 bilder för bästa AI-resultat!");
+  const handleStartUpload = async () => {
+    if (selectedFiles.length < 3) {
+      alert("Ladda upp minst 3-5 bilder för bästa resultat!");
       return;
     }
-    setIsTraining(true);
+    setIsUploading(true);
     try {
-      const path = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger);
-      setTrainedModelId(path);
-      localStorage.setItem('my_saved_lora_model', path);
-      setTrainingStatus('✅ Träningen är klar! Din unika AI-karaktär är sparad och redo.');
+      const urls = await uploadImagesToBlob(selectedFiles, setUploadStatus);
+      setMainImageUrls(urls);
+      setUploadStatus('✅ Bilderna uppladdade! Redo att skapa berättelser.');
     } catch (error) {
       console.error(error);
-      setTrainingStatus('❌ Ett fel uppstod vid start av träningen.');
+      setUploadStatus('❌ Uppladdningen misslyckades.');
     } finally {
-      setIsTraining(false);
+      setIsUploading(false);
     }
   };
 
-  const handleStartCompanionTraining = async () => {
-    if (companionFiles.length < 5) {
-      alert(`Ladda upp minst 5 bilder på ${companionName || "din kompis"}!`);
+  const handleStartCompanionUpload = async () => {
+    if (companionFiles.length < 3) {
+      alert(`Ladda upp minst 3-5 bilder på ${companionName || "din kompis"}!`);
       return;
     }
-    setIsTrainingCompanion(true);
+    setIsUploadingCompanion(true);
     try {
-      const path = await startTrainingJob(companionFiles, setCompanionTrainingStatus, 'COMPANIONTOK');
-      setCompanionModelId(path);
-      localStorage.setItem('my_saved_companion_lora_model', path);
-      setCompanionTrainingStatus('✅ Träningen klar! Kompisens AI är redo.');
+      const urls = await uploadImagesToBlob(companionFiles, setCompanionUploadStatus);
+      setCompanionImageUrls(urls);
+      setCompanionUploadStatus('✅ Kompisens bilder uppladdade!');
     } catch (error) {
       console.error(error);
-      setCompanionTrainingStatus('❌ Träningen misslyckades.');
+      setCompanionUploadStatus('❌ Uppladdningen misslyckades.');
     } finally {
-      setIsTrainingCompanion(false);
+      setIsUploadingCompanion(false);
     }
   };
 
@@ -198,11 +151,18 @@ export default function Page() {
 
   const generateImagesForComic = async (comicData: any) => {
     setIsGeneratingImages(true);
+    
+    // Samla alla referensbilder för både Simon och kompisen
+    const combinedReferences = [...mainImageUrls];
+    if (useCustomCompanionAI) {
+      combinedReferences.push(...companionImageUrls);
+    }
+
     for (let i = 0; i < comicData.panels.length; i++) {
       const panel = comicData.panels[i];
       setCurrentlyGeneratingPanel(panel.panel_number);
 
-      if (i > 0) await delay(10000); 
+      if (i > 0) await delay(4000); // Nano Banana 2 genererar på 3 sekunder, så 4s delay är perfekt!
 
       try {
         const response = await fetch('/api/generate-image', {
@@ -210,9 +170,8 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             prompt: panel.image_prompt, 
-            trainedModelId: trainedModelId,
-            extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
-            extraLoraScale: 0.8
+            imageInputs: combinedReferences,
+            aspect_ratio: "4:3"
           }),
         });
         
@@ -241,7 +200,7 @@ export default function Page() {
     if (companionType === 'dog') secondaryDescription = `a friendly golden retriever dog named ${companionName || "Aston"}`;
     if (companionType === 'cat') secondaryDescription = `a cute fluffy cat named ${companionName || "Misse"}`;
     if (companionType === 'friend') {
-      if (useCustomCompanionAI && companionModelId) {
+      if (useCustomCompanionAI && companionImageUrls.length > 0) {
         secondaryDescription = `a close friend named ${companionName || "Lovisa"} represented by COMPANIONTOK, an adult man`;
       } else {
         secondaryDescription = `a close friend named ${companionName || "Lovisa"}, an adult man`;
@@ -255,7 +214,7 @@ export default function Page() {
         body: JSON.stringify({ 
           prompt: memory,
           characterName: charName,
-          characterTrigger: charTrigger,
+          characterTrigger: 'TOK',
           characterDescription: charDesc,
           secondaryName: companionName || null,
           secondaryTrigger: secondaryDescription || null
@@ -278,7 +237,7 @@ export default function Page() {
 
   const handleRegeneratePanel = async (panelNumber: number, originalPrompt: string) => {
     const instruction = customPrompts[panelNumber];
-    if (!instruction || !instruction.trim() || !trainedModelId) return;
+    if (!instruction || !instruction.trim()) return;
 
     setPanelsLoading(prev => ({ ...prev, [panelNumber]: true }));
     try {
@@ -291,16 +250,18 @@ export default function Page() {
       const refineData = await refineRes.json();
       const newPrompt = refineData.refinedPrompt;
 
-      console.log(`Ny raffinerad prompt för panel ${panelNumber}: ${newPrompt}`);
+      const combinedReferences = [...mainImageUrls];
+      if (useCustomCompanionAI) {
+        combinedReferences.push(...companionImageUrls);
+      }
 
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           prompt: newPrompt, 
-          trainedModelId: trainedModelId,
-          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
-          extraLoraScale: 0.8
+          imageInputs: combinedReferences,
+          aspect_ratio: "4:3"
         }),
       });
       
@@ -338,7 +299,7 @@ export default function Page() {
           Turn any idea into a <span className="text-purple-500">comic book</span>
         </h1>
         <p className="mt-4 text-lg text-gray-600">
-          Step 1: Train the AI on your character. Step 2: Write a story!
+          Step 1: Upload photos of your character. Step 2: Write a story!
         </p>
       </div>
 
@@ -346,10 +307,9 @@ export default function Page() {
         
         {/* STEG 1: BILDUPPLADDNING OCH DYNAMISKA INSTÄLLNINGAR */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left space-y-4">
-          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train Main AI Character</h3>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Add Main Character</h3>
           
-          {/* NYTT DYNAMISKT GRÄNSSNITT */}
-          <div className="grid grid-cols-3 gap-3 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+          <div className="grid grid-cols-2 gap-3 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
             <div>
               <label className="block text-xs font-bold text-purple-900 mb-1">Namn</label>
               <input 
@@ -374,22 +334,13 @@ export default function Page() {
                 <option value="a cute fluffy cat">Katt 🐱</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-purple-900 mb-1">Triggerord</label>
-              <input 
-                type="text" 
-                className="w-full px-3 py-2 text-sm bg-white border border-purple-200 rounded-lg text-gray-800 focus:outline-none"
-                value={charTrigger}
-                onChange={(e) => setCharacterTrigger(e.target.value)}
-              />
-            </div>
           </div>
 
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
           
           <div className="flex flex-col gap-4 pt-2">
             <div className="flex items-center gap-4">
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading || mainImageUrls.length > 0} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
                 Choose Photos
               </button>
               {selectedFiles.length > 0 && (
@@ -397,28 +348,28 @@ export default function Page() {
               )}
             </div>
 
-            {selectedFiles.length >= 5 && !trainedModelId && (
-              <button onClick={handleStartTraining} disabled={isTraining} className="mt-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition disabled:opacity-50">
-                {isTraining ? 'Training in progress...' : '🚀 Start AI Training'}
+            {selectedFiles.length >= 3 && mainImageUrls.length === 0 && (
+              <button onClick={handleStartUpload} disabled={isUploading} className="mt-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition disabled:opacity-50">
+                {isUploading ? 'Uploading...' : '🚀 Ladda upp bilder'}
               </button>
             )}
 
-            {trainingStatus && (
+            {uploadStatus && (
               <div className="mt-2 p-3 bg-blue-50 text-blue-800 rounded-lg font-mono text-sm">
-                {trainingStatus}
+                {uploadStatus}
               </div>
             )}
             
-            {trainedModelId && (
-              <button onClick={() => { localStorage.removeItem('my_saved_lora_model'); setTrainedModelId(null); setTrainingStatus(''); }} className="text-xs text-red-500 hover:underline text-left mt-1">
-                🗑️ Ta bort sparad AI och träna en ny karaktär
+            {mainImageUrls.length > 0 && (
+              <button onClick={() => { setMainImageUrls([]); setUploadStatus(''); setSelectedFiles([]); }} className="text-xs text-red-500 hover:underline text-left mt-1">
+                🗑️ Ta bort sparade bilder och ladda upp nya
               </button>
             )}
           </div>
         </div>
 
         {/* HYBRID VÄLJARE FÖR FÖLJESLAGARE */}
-        <div className={`rounded-[2rem] border-4 border-dashed border-blue-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`rounded-[2rem] border-4 border-dashed border-blue-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${mainImageUrls.length === 0 ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-1">🐕 Lägg till en kompis eller ett husdjur</h3>
           <p className="text-xs text-gray-500 mb-4">Vem vill du ska följa med på äventyret?</p>
           
@@ -449,7 +400,6 @@ export default function Page() {
                 onChange={(e) => setCompanionName(e.target.value)}
               />
 
-              {/* UNIK FUNKTION: ANPASSAD AI FÖR KOMPIS */}
               {companionType === 'friend' && (
                 <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -464,11 +414,11 @@ export default function Page() {
 
                   {useCustomCompanionAI && (
                     <div className="space-y-3 pt-2 border-t border-blue-100/50">
-                      <p className="text-xs text-gray-500">Ladda upp 5-15 bilder på {companionName || "kompisen"} för att få perfekt ansiktslikhet!</p>
+                      <p className="text-xs text-gray-500">Ladda upp 3-5 bilder på {companionName || "kompisen"} för perfekta detaljer!</p>
                       <input type="file" multiple ref={companionFileInputRef} onChange={handleCompanionFileSelection} className="hidden" accept="image/*" />
                       
                       <div className="flex items-center gap-3">
-                        <button type="button" onClick={() => companionFileInputRef.current?.click()} disabled={isTrainingCompanion || companionModelId !== null} className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded-lg text-xs transition disabled:opacity-50">
+                        <button type="button" onClick={() => companionFileInputRef.current?.click()} disabled={isUploadingCompanion || companionImageUrls.length > 0} className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded-lg text-xs transition disabled:opacity-50">
                           Välj foton på {companionName || "kompisen"}
                         </button>
                         {companionFiles.length > 0 && (
@@ -476,21 +426,21 @@ export default function Page() {
                         )}
                       </div>
 
-                      {companionFiles.length >= 5 && !companionModelId && (
-                        <button onClick={handleStartCompanionTraining} disabled={isTrainingCompanion} className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition disabled:opacity-50">
-                          {isTrainingCompanion ? 'Tränar...' : `🚀 Starta AI-träning för ${companionName || "kompisen"}`}
+                      {companionFiles.length >= 3 && companionImageUrls.length === 0 && (
+                        <button onClick={handleStartCompanionUpload} disabled={isUploadingCompanion} className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition disabled:opacity-50">
+                          {isUploadingCompanion ? 'Laddar upp...' : `🚀 Ladda upp bilder för ${companionName || "kompisen"}`}
                         </button>
                       )}
 
-                      {companionTrainingStatus && (
+                      {companionUploadStatus && (
                         <div className="p-2 bg-white border border-blue-200 text-blue-800 rounded-lg font-mono text-xs">
-                          {companionTrainingStatus}
+                          {companionUploadStatus}
                         </div>
                       )}
 
-                      {companionModelId && (
-                        <button onClick={() => { localStorage.removeItem('my_saved_companion_lora_model'); setCompanionModelId(null); setCompanionTrainingStatus(''); setCompanionFiles([]); }} className="text-[10px] text-red-500 hover:underline block">
-                          🗑️ Ta bort sparad AI för {companionName || "kompisen"}
+                      {companionImageUrls.length > 0 && (
+                        <button onClick={() => { setCompanionImageUrls([]); setCompanionUploadStatus(''); setCompanionFiles([]); }} className="text-[10px] text-red-500 hover:underline block">
+                          🗑️ Ta bort bilder på {companionName || "kompisen"}
                         </button>
                       )}
                     </div>
@@ -501,12 +451,12 @@ export default function Page() {
           )}
         </div>
 
-        <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${mainImageUrls.length === 0 ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
-          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. Simon and Aston going on an exciting flight simulator ride..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
+          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. Simon and Aston going on an exciting flight simulator ride..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || mainImageUrls.length === 0} />
         </div>
 
-        <button type="button" onClick={handleCreateStory} disabled={isLoadingScript || !trainedModelId} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-xl font-bold text-white hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100">
+        <button type="button" onClick={handleCreateStory} disabled={isLoadingScript || mainImageUrls.length === 0} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-xl font-bold text-white hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100">
           {isLoadingScript ? 'Directing comic script...' : '🪄 Generate Comic Book'}
         </button>
       </div>

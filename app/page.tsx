@@ -220,4 +220,29 @@ export default function Page() {
             trainedModelId: trainedModelId,
             extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
             extraLoraScale: 0.8
-   
+          }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setGeneratedImages(prev => ({...prev, [panel.panel_number]: data.imageUrl}));
+        }
+      } catch (err) {
+        console.error(`Failed to generate image`, err);
+      }
+      setCurrentlyGeneratingPanel(null);
+    }
+    setIsGeneratingImages(false);
+  };
+
+  const handleCreateStory = async () => {
+    if (!memory.trim()) {
+      alert("Beskriv ett äventyr först!");
+      return;
+    }
+    setIsLoadingScript(true);
+    setComic(null);
+    setGeneratedImages({});
+
+    let secondaryDescription = "";
+    const companionTriggerWord = `${companionNa

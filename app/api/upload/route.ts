@@ -1,28 +1,23 @@
 import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const filename = searchParams.get('filename');
-
-    if (!filename) {
-      return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const body = request.body;
-    if (!body) {
-      return NextResponse.json({ error: 'No file body found' }, { status: 400 });
-    }
-
-    // Vi sätter denna till public nu när din store är public!
-    const blob = await put(filename, body, {
+    // Ladda upp direkt till ditt befintliga Vercel Blob-store
+    const blob = await put(`storybook/${Date.now()}-${file.name}`, file, {
       access: 'public',
     });
 
-    return NextResponse.json(blob);
+    return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 }

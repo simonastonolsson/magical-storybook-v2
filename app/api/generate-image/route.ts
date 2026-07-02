@@ -3,52 +3,45 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
-  useFileOutput: false 
 } as any);
 
 export async function POST(request: Request) {
   try {
-    const { prompt, imageInputs, aspect_ratio } = await request.json();
+    const { prompt, trainedModelId, extraLoraId, extraLoraScale } = await request.json();
 
-    console.log(`Skapar bild med hög likhet i Nano Banana 2 för: ${prompt}`);
+    if (!trainedModelId) {
+      return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
+    }
+
+    console.log(`Skapar LoRA-bild för prompt: ${prompt}`);
 
     const input: any = {
       prompt: prompt,
-      aspect_ratio: aspect_ratio || "4:3",
-      resolution: "1K",
-      output_format: "jpg",
-      
-      // HÄR ÄR NYCKELN: Vi ökar troheten (subject fidelity) till 0.9 (standard är ofta ~0.6-0.7).
-      // Detta tvingar Nano Banana 2 att fästa extremt stor vikt vid era faktiska ansikten!
-      subject_fidelity: 0.9,
-      image_reference_weight: 0.9
+      width: 1024,
+      height: 768,
+      num_inference_steps: 28, 
+      guidance_scale: 3.5,     
+      lora_scale: 1.0 
     };
 
-    // Skicka med bilderna direkt som referenser till Nano Banana 2
-    if (imageInputs && Array.isArray(imageInputs) && imageInputs.length > 0) {
-      input.image_input = imageInputs.slice(0, 14);
+    // Koppla på den sekundära LoRA-modellen (t.ex. Baran) om den är aktiv
+    if (extraLoraId) {
+      let formattedLora = extraLoraId;
+      if (formattedLora.includes(':') && !formattedLora.startsWith('http')) {
+        formattedLora = formattedLora.replace(':', '/');
+      }
+      input.extra_lora = formattedLora;
+      input.extra_lora_scale = extraLoraScale || 0.8;
     }
 
     const output = await replicate.run(
-      "google/nano-banana-2",
+      trainedModelId as `${string}/${string}:${string}`, 
       { input }
     );
 
-    let finalImageUrl = "";
-    if (typeof output === 'string') {
-      finalImageUrl = output;
-    } else if (Array.isArray(output) && output.length > 0) {
-      const first = output[0];
-      finalImageUrl = typeof first === 'string' ? first : (first?.url || first?.toString() || "");
-    } else if (output && typeof output === 'object') {
-      finalImageUrl = (output as any).url || output.toString() || "";
-    }
+    const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
 
-    console.log(`Hittade bildlänk: ${finalImageUrl}`);
-
-    if (!finalImageUrl || finalImageUrl.includes('[object')) {
-      return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
-    }
+    if (!finalImageUrl) return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
 
     return NextResponse.json({ imageUrl: finalImageUrl });
 

@@ -13,8 +13,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
     }
 
-    // TA KONTROLL ÖVER STILEN (Proaktiv affärsåtgärd för 100% röd tråd):
-    // Vi rensar bort eventuella gamla stilar och injicerar stenhårda färg- och seriestils-ankare.
+    // TA STENHÅRT KOMMANDO ÖVER 2D-STILEN:
+    // Vi rensar bort Geminis egna stil-prefix för att undvika dubbletter
     let cleanedPrompt = prompt || "";
     const stylePrefixes = [
       "Comic book panel illustration, graphic novel art,",
@@ -26,12 +26,13 @@ export async function POST(request: Request) {
         cleanedPrompt = cleanedPrompt.slice(prefix.length).trim();
       }
     }
-    cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, ""); // Ta bort överflödiga kommatecken
+    cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // Vi sätter samman den slutgiltiga, skottsäkra prompten med stenhård stilkontroll
-    const finalPrompt = `Comic book panel illustration, graphic novel art, full color, vibrant comic book color palette, clean outlines, sharp ink lines, professional comic book coloring, ${cleanedPrompt}, high quality comic book illustration, color ink art. Avoid black and white, avoid monochrome, avoid photorealism, avoid desaturated colors.`;
+    // VI SKAPAR DET ULTIMATA 2D-STIL-LÅSET:
+    // Vi lägger till explicita instruktioner för platt 2D och förbjuder all form av 3D, CGI och fotorealism!
+    const finalPrompt = `Comic book panel illustration, graphic novel art style, flat 2D vector colors, bold clean black ink outlines, professional comic book cell-shading, ${cleanedPrompt}, high quality 2D comic book illustration. Avoid 3D render, avoid CGI, avoid photorealism, avoid 3D digital shading, avoid realistic lighting, avoid photography, avoid octane render.`;
 
-    console.log(`Skapar officiell Flux LoRA-bild med stenhård stil-kontroll: ${finalPrompt}`);
+    console.log(`Skapar Flux-bild med stenhårt 2D-stil-lås: ${finalPrompt}`);
 
     const input: any = {
       prompt: finalPrompt,

@@ -13,8 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
     }
 
-    // TA STENHÅRT KOMMANDO ÖVER 2D-STILEN:
-    // Vi rensar bort Geminis egna stil-prefix för att undvika dubbletter
+    // Vi rensar bort eventuella gamla stil-prefix från prompten
     let cleanedPrompt = prompt || "";
     const stylePrefixes = [
       "Comic book panel illustration, graphic novel art,",
@@ -28,11 +27,12 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // VI SKAPAR DET ULTIMATA 2D-STIL-LÅSET:
-    // Vi lägger till explicita instruktioner för platt 2D och förbjuder all form av 3D, CGI och fotorealism!
-    const finalPrompt = `Comic book panel illustration, graphic novel art style, flat 2D vector colors, bold clean black ink outlines, professional comic book cell-shading, ${cleanedPrompt}, high quality 2D comic book illustration. Avoid 3D render, avoid CGI, avoid photorealism, avoid 3D digital shading, avoid realistic lighting, avoid photography, avoid octane render.`;
+    // VI LÅSER STILEN TILL EXAKT "LAMA-BILDENS" MYSIGA AKVARELL-STIL:
+    // Vi använder mjuka färger, akvarelltexturer, eleganta linjer och varmt naturligt ljus.
+    // Vi förbjuder stenhårt hårda superhjältestilar, 3D och kalla digitala vektorer.
+    const finalPrompt = `Cozy hand-drawn indie graphic novel illustration style, charming heartwarming slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming art, beautifully colored, warm and inviting cozy atmosphere. Avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid photorealism, avoid dark moody colors.`;
 
-    console.log(`Skapar Flux-bild med stenhårt 2D-stil-lås: ${finalPrompt}`);
+    console.log(`Skapar Flux-bild med den exklusiva mysiga 2D-stilen (Lama-stil): ${finalPrompt}`);
 
     const input: any = {
       prompt: finalPrompt,

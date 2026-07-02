@@ -6,7 +6,7 @@ export async function POST(req: Request) {
       prompt, 
       characterName, 
       characterTrigger, 
-      characterDescription, // t.ex. "an adult man", "a young girl"
+      characterDescription,
       secondaryName, 
       secondaryTrigger 
     } = await req.json();
@@ -16,7 +16,6 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Vi sätter säkra standardvärden om fälten mot förmodan skulle saknas
     const name = characterName || "Simon";
     const trigger = characterTrigger || "TOK";
     const desc = characterDescription || "an adult man";
@@ -59,7 +58,6 @@ export async function POST(req: Request) {
 
     let result;
     try {
-      // Försök först med gemini-2.5-flash
       const model = genAI.getGenerativeModel({
         model: "gemini-2.5-flash", 
         generationConfig: { responseMimeType: "application/json" }
@@ -67,8 +65,6 @@ export async function POST(req: Request) {
       result = await model.generateContent(fullPrompt);
     } catch (primaryError) {
       console.warn("gemini-2.5-flash är överbelastad, testar fallback gemini-2.5-flash-lite...");
-      
-      // Fallback till den stensäkra gemini-2.5-flash-lite
       const fallbackModel = genAI.getGenerativeModel({
         model: "gemini-2.5-flash-lite",
         generationConfig: { responseMimeType: "application/json" }

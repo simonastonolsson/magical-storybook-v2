@@ -3,23 +3,28 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
-  useFileOutput: false // Tvingar Replicate att returnera snabba bildlänkar istället för filer
-} as any); // as any förbigår typkontrollen vid bygget så att det kompilerar felfritt!
+  useFileOutput: false 
+} as any);
 
 export async function POST(request: Request) {
   try {
     const { prompt, imageInputs, aspect_ratio } = await request.json();
 
-    console.log(`Skapar bild med Nano Banana 2 för prompt: ${prompt}`);
+    console.log(`Skapar bild med hög likhet i Nano Banana 2 för: ${prompt}`);
 
     const input: any = {
       prompt: prompt,
       aspect_ratio: aspect_ratio || "4:3",
       resolution: "1K",
-      output_format: "jpg"
+      output_format: "jpg",
+      
+      // HÄR ÄR NYCKELN: Vi ökar troheten (subject fidelity) till 0.9 (standard är ofta ~0.6-0.7).
+      // Detta tvingar Nano Banana 2 att fästa extremt stor vikt vid era faktiska ansikten!
+      subject_fidelity: 0.9,
+      image_reference_weight: 0.9
     };
 
-    // Skicka med bilderna direkt som referenser till Nano Banana 2 (upp till 14 bilder!)
+    // Skicka med bilderna direkt som referenser till Nano Banana 2
     if (imageInputs && Array.isArray(imageInputs) && imageInputs.length > 0) {
       input.image_input = imageInputs.slice(0, 14);
     }
@@ -29,7 +34,6 @@ export async function POST(request: Request) {
       { input }
     );
 
-    // DYNAMISK OCH SKOTTSÄKER BILD-TOLKARE (Parser)
     let finalImageUrl = "";
     if (typeof output === 'string') {
       finalImageUrl = output;

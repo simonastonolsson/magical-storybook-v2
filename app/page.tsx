@@ -341,8 +341,51 @@ export default function Page() {
     }
   };
 
+  // KLIENT-SÄKER PDF GENERERING VIA WEBBLÄSARENS PRINT-MOTOR
+  const handleDownloadPDF = () => {
+    window.print();
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50 font-sans">
+      {/* INBYGGD PRINT-STYLING FÖR ATT GÖRA PDF-UTSKRIFTEN HELT PERFEKT OCH PROFESSIONELL */}
+      <style>{`
+        @media print {
+          body {
+            background: white !important;
+            color: black !important;
+          }
+          /* Dölj alla knappar, uppladdningsrutor, formulär och textfält */
+          main > div:first-of-type,
+          main > .w-full.max-w-2xl,
+          .mt-2.flex,
+          .border-t,
+          .pdf-btn,
+          footer, header {
+            display: none !important;
+          }
+          /* Gör comic book-behållaren till helsida */
+          .mt-16 {
+            margin-top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          /* Formatera galleriet till en snygg boklayout */
+          .grid {
+            display: grid !important;
+            grid-template-cols: 1fr 1fr !important;
+            gap: 20px !important;
+          }
+          /* Se till att bilderna inte bryts fult mitt på en sida */
+          .grid > div {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-shadow: none !important;
+            border: 4px solid black !important;
+          }
+        }
+      `}</style>
+
       <div className="mb-12 max-w-3xl mt-10">
         <h1 className="text-5xl font-bold text-gray-800">
           Turn any idea into a <span className="text-purple-500">comic book</span>
@@ -513,11 +556,18 @@ export default function Page() {
 
       {comic && (
         <div className="mt-16 w-full max-w-5xl">
-          <h2 className="text-4xl font-black text-gray-800 mb-8 uppercase tracking-wide">{comic.title}</h2>
+          <div className="flex justify-between items-center mb-8 pdf-btn">
+            <h2 className="text-4xl font-black text-gray-800 uppercase tracking-wide text-left">{comic.title}</h2>
+            <button 
+              onClick={handleDownloadPDF}
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-105 transition-transform text-white font-bold rounded-full shadow-lg flex items-center gap-2"
+            >
+              Ladda ner som PDF 📄
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {comic.panels.map((panel: any) => (
               <div key={panel.panel_number} className="bg-white border-4 border-gray-900 rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col text-left">
-                {/* UPPDATERAT: ASPECT ratio till 4:3 för att förhindra inzoomning i webbläsaren! */}
                 <div className="bg-gray-200 w-full aspect-[4/3] flex flex-col items-center justify-center p-0 border-b-4 border-gray-900 relative overflow-hidden">
                   {generatedImages[panel.panel_number] ? (
                     <img src={generatedImages[panel.panel_number]} alt={`Panel ${panel.panel_number}`} className="w-full h-full object-cover" />
@@ -535,7 +585,6 @@ export default function Page() {
                 </div>
                 <div className="p-4 bg-yellow-50 min-h-[100px] flex flex-col justify-between">
                   <p className="text-gray-800 font-medium text-lg leading-relaxed mb-4">{panel.narration}</p>
-                  
                   {generatedImages[panel.panel_number] && (
                     <div className="mt-2 flex gap-2 pt-4 border-t border-yellow-200/50">
                       <input

@@ -99,22 +99,4 @@ export async function POST(req: Request) {
     }
 
     if (!result) {
-      throw new Error("Failed to generate story after multiple retries");
-    }
-
-    let text = result.response.text();
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    text = text.replace(/\/\/.*$/gm, "");
-    text = text.replace(/,\s*([\]}])/g, "$1");
-
-    const comicData = JSON.parse(text);
-
-    return new Response(JSON.stringify({ comic: comicData }), {
-      headers: { "Content-Type": "application/json" },
-    });
-
-  } catch (error) {
-    console.error("Story error:", error);
-    return new Response(JSON.stringify({ error: "Failed to generate story" }), { status: 500 });
-  }
-}
+      throw new Error("Failed

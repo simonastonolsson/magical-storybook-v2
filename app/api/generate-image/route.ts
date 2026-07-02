@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
+  useFileOutput: false // Tvingar Replicate att returnera snabba bildlänkar istället för filer
 });
 
 export async function POST(request: Request) {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
       output_format: "jpg"
     };
 
-    // Skicka med bilderna direkt som referenser till Nano Banana 2 (stödjer upp till 14 bilder!)
+    // Skicka med bilderna direkt som referenser till Nano Banana 2 (upp till 14 bilder!)
     if (imageInputs && Array.isArray(imageInputs) && imageInputs.length > 0) {
       input.image_input = imageInputs.slice(0, 14);
     }
@@ -28,9 +29,20 @@ export async function POST(request: Request) {
       { input }
     );
 
-    const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
+    // DYNAMISK OCH SKOTTSÄKER BILD-TOLKARE (Parser)
+    let finalImageUrl = "";
+    if (typeof output === 'string') {
+      finalImageUrl = output;
+    } else if (Array.isArray(output) && output.length > 0) {
+      const first = output[0];
+      finalImageUrl = typeof first === 'string' ? first : (first?.url || first?.toString() || "");
+    } else if (output && typeof output === 'object') {
+      finalImageUrl = (output as any).url || output.toString() || "";
+    }
 
-    if (!finalImageUrl) {
+    console.log(`Hittade bildlänk: ${finalImageUrl}`);
+
+    if (!finalImageUrl || finalImageUrl.includes('[object')) {
       return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
     }
 

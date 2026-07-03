@@ -14,7 +14,6 @@ export async function POST(request: Request) {
     }
 
     // TA STENHÅRT KOMMANDO ÖVER 2D-STILEN:
-    // Vi rensar bort Geminis egna stil-prefix för att undvika dubbletter
     let cleanedPrompt = prompt || "";
     const stylePrefixes = [
       "Comic book panel illustration, graphic novel art,",
@@ -28,14 +27,14 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // VI LÅSER STILEN TILL EXAKT "LAMA-BILDENS" MYSIGA AKVARELL-STIL:
-    const finalPrompt = `Cozy hand-drawn indie graphic novel illustration style, charming heartwarming slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming art, beautifully colored, warm and inviting cozy atmosphere. Avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid photorealism, avoid dark moody colors.`;
+    // VI FÖRSTÄRKER DESIGN-STILEN (Lama-stil):
+    // Vi lägger till stenhårda krav på naturliga ansiktsproportioner ("natural facial features", "finely detailed realistic eyes")
+    // för att hindra att starka objekt som bilar förvandlar karaktären till en generisk 3D-docka eller Chibi.
+    const finalPrompt = `Cozy hand-drawn indie graphic novel illustration style, charming heartwarming slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, natural facial proportions, finely detailed eyes, authentic face expression, high quality heartwarming art, beautifully colored, warm and inviting cozy atmosphere. Avoid chibi style, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid photorealism, avoid dark moody colors.`;
 
     console.log(`Skapar Flux-bild med den exklusiva mysiga 2D-stilen (Lama-stil): ${finalPrompt}`);
 
-    // DYNAMISK LIKHETS-BOOST (SaaS-Premiumfunktion):
-    // Om bilden handlar om ett barn (boy, girl, child, baby) så skruvar vi upp lora_scale 
-    // från 1.0 till 1.15 för att motverka att AI:ns standardansikten suddar ut barnets likhet!
+    // DYNAMISK LIKHETS-BOOST:
     const isChild = finalPrompt.toLowerCase().includes("boy") || 
                     finalPrompt.toLowerCase().includes("girl") || 
                     finalPrompt.toLowerCase().includes("child") ||
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
       guidance_scale: 3.5,     
       
       lora_weights: trainedModelId,
-      lora_scale: activeLoraScale // Den dolda, intelligenta skalan
+      lora_scale: activeLoraScale
     };
 
     if (extraLoraId) {

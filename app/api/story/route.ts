@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Hjälpfunktion för att vänta x millisekunder
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(req: Request) {
@@ -11,7 +12,8 @@ export async function POST(req: Request) {
       characterDescription,
       secondaryName, 
       secondaryTrigger,
-      secondaryTriggerWord
+      secondaryTriggerWord,
+      pageCount // Det dynamiska sidantalet skickat från hemsidan (t.ex. 4, 8, 12 eller 16)
     } = await req.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -22,6 +24,7 @@ export async function POST(req: Request) {
     const name = characterName || "Simon";
     const trigger = characterTrigger || "TOK";
     const desc = characterDescription || "an adult man";
+    const finalPageCount = pageCount || 12; // Fallback till 12 sidor om inget skickats
 
     const companionInstruction = secondaryName && secondaryTrigger && secondaryTriggerWord
       ? `There is also a companion in the story: ${secondaryTrigger}. 
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
       - ${companionInstruction}
 
       DIRECTOR RULES FOR WRITING (CRITICAL FOR NARRATIVE FLOW & VARIATION):
-      1. Create exactly 16 panels, numbered strictly 1 to 16. Do not skip any panel, do not collapse any panels.
+      1. Create exactly ${finalPageCount} panels, numbered strictly 1 to ${finalPageCount}. Do not skip any panel, do not collapse any panels, and output EXACTLY ${finalPageCount} panels total.
       2. Write "title" and panel "narration" in the SAME LANGUAGE as the user's prompt (Swedish in this case).
       3. Write "image_prompt" in ENGLISH.
       4. VARIETY & ACTION (STRICT RULE): The main characters must NOT just stand and pose or look at the camera. They should be active, looking at each other, looking at things in their environment, or engaged in actions.
@@ -69,6 +72,9 @@ export async function POST(req: Request) {
         ]
       }`;
 
+    // NYCKELN FÖR SKOTTSÄKER DRIFT (Retry på gemini-2.5-flash):
+    // Eftersom gemini-2.5-pro har en stenhård begränsning på 0 requests på Free Tier (429),
+    // och 503 High Demand på Flash nästan alltid är tillfällig, så kör vi automatisk retry på Flash!
     let result;
     const maxRetries = 3;
     let attempt = 0;
@@ -80,13 +86,14 @@ export async function POST(req: Request) {
           generationConfig: { responseMimeType: "application/json" }
         });
         result = await model.generateContent(fullPrompt);
-        break;
+        break; // Om det lyckas bryter vi loopen direkt!
       } catch (error: any) {
         attempt++;
         console.warn(`Attempt ${attempt} failed with error: ${error.message || error}`);
         if (attempt >= maxRetries) {
-          throw error;
+          throw error; // Om vi nått maxgränsen kastar vi felet vidare
         }
+        // Vänta lite längre för varje misslyckat försök (exponential backoff: 1.5s, 3s)
         const waitTime = attempt * 1500;
         console.warn(`Waiting ${waitTime}ms before retry...`);
         await delay(waitTime);

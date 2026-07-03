@@ -650,5 +650,3 @@ export default function Page() {
     </main>
   );
 }
-"""
-}# Now let's explain this to the user in a warm, helpful manner.

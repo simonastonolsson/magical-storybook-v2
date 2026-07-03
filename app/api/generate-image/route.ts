@@ -13,7 +13,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
     }
 
-    // Vi rensar bort eventuella gamla stil-prefix från prompten
+    // TA STENHÅRT KOMMANDO ÖVER 2D-STILEN:
+    // Vi rensar bort Geminis egna stil-prefix för att undvika dubbletter
     let cleanedPrompt = prompt || "";
     const stylePrefixes = [
       "Comic book panel illustration, graphic novel art,",
@@ -28,11 +29,20 @@ export async function POST(request: Request) {
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
     // VI LÅSER STILEN TILL EXAKT "LAMA-BILDENS" MYSIGA AKVARELL-STIL:
-    // Vi använder mjuka färger, akvarelltexturer, eleganta linjer och varmt naturligt ljus.
-    // Vi förbjuder stenhårt hårda superhjältestilar, 3D och kalla digitala vektorer.
     const finalPrompt = `Cozy hand-drawn indie graphic novel illustration style, charming heartwarming slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming art, beautifully colored, warm and inviting cozy atmosphere. Avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid photorealism, avoid dark moody colors.`;
 
     console.log(`Skapar Flux-bild med den exklusiva mysiga 2D-stilen (Lama-stil): ${finalPrompt}`);
+
+    // DYNAMISK LIKHETS-BOOST (SaaS-Premiumfunktion):
+    // Om bilden handlar om ett barn (boy, girl, child, baby) så skruvar vi upp lora_scale 
+    // från 1.0 till 1.15 för att motverka att AI:ns standardansikten suddar ut barnets likhet!
+    const isChild = finalPrompt.toLowerCase().includes("boy") || 
+                    finalPrompt.toLowerCase().includes("girl") || 
+                    finalPrompt.toLowerCase().includes("child") ||
+                    finalPrompt.toLowerCase().includes("baby");
+
+    const activeLoraScale = isChild ? 1.15 : 1.0;
+    console.log(`Använder LoRA-skala: ${activeLoraScale} (Barn-boost aktiv: ${isChild})`);
 
     const input: any = {
       prompt: finalPrompt,
@@ -42,7 +52,7 @@ export async function POST(request: Request) {
       guidance_scale: 3.5,     
       
       lora_weights: trainedModelId,
-      lora_scale: 1.0 
+      lora_scale: activeLoraScale // Den dolda, intelligenta skalan
     };
 
     if (extraLoraId) {

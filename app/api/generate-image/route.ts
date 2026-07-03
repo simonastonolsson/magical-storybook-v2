@@ -13,7 +13,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
     }
 
-    // TA STENHÅRT KOMMANDO ÖVER 2D-STILEN:
     let cleanedPrompt = prompt || "";
     const stylePrefixes = [
       "Comic book panel illustration, graphic novel art,",
@@ -27,30 +26,40 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // VI FINJUSTERAR DET PERFEKTA 2D-STILLÅSET:
-    // Vi beskriver bakgrunderna och dinosaurierna med Ghibli-akvarell,
-    // men vi kräver en stark och tydlig 2D-porträttering av MARLONTOK med hans verkliga ansiktsdrag!
-    const finalPrompt = `Cozy heartwarming 2D hand-drawn watercolor illustration, cozy Ghibli slice-of-life anime aesthetic. Main subject is a highly recognizable 2D drawing of MARLONTOK, showing his actual facial features, authentic eyes, and natural hairstyle. Beautiful soft watercolor background textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid generic cartoon face, avoid doll face, avoid round chibi faces, avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid realistic skin textures, avoid 3D render, avoid CGI.`;
+    // INTELLIGENT KEYWORD-INTERCEPTION (SaaS-Magi):
+    // Vi skannar prompten efter hög-bias ord som "sportbil", "car", "basketball" etc.
+    // som brukar dra ner stilen till plastig 3D/CGI, och tvingar dem att bli tecknade!
+    let lowerPrompt = cleanedPrompt.toLowerCase();
+    
+    if (lowerPrompt.includes("sportbil") || lowerPrompt.includes("sports car") || lowerPrompt.includes("car")) {
+      cleanedPrompt = cleanedPrompt.replace(/sports car|sportbil|car/gi, "whimsical vintage hand-drawn 2D watercolor red car");
+    }
+    if (lowerPrompt.includes("basket") || lowerPrompt.includes("basketball")) {
+      cleanedPrompt = cleanedPrompt.replace(/basketball court|basketplan/gi, "charming rustic hand-drawn outdoor court in a grassy meadow");
+      cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "charming hand-drawn watercolor basketball");
+    }
 
-    console.log(`Skapar Flux-bild med perfekt likhet och Ghibli-stil: ${finalPrompt}`);
+    // EXKLUSIVT RECEPT FÖR BILD 1-KVALITET:
+    // Vi lånar de exakta egenskaperna från Bild 1: "soft pencil sketch", "charming storybook illustration", 
+    // "muted watercolor washes", "detailed face with realistic child features".
+    const finalPrompt = `Cozy heartwarming 2D hand-drawn watercolor children's storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines. Main subject is a highly recognizable, detailed 2D portrait of MARLONTOK as a young boy with his actual realistic child facial features, authentic detailed eyes, and natural hairstyle. Placed in a cozy, soft-textured environment: ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid chibi doll face, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid plastic 3D CGI, avoid glossy renders, avoid TV-game graphics, avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid dark moody colors.`;
 
-    // DYNAMISK LIKHETS-BOOST (SaaS-Guldstandard):
-    // Vi höjer skalan till 0.98 för barn för att tvinga fram Marlons unika ansikte,
-    // men håller kvar den konstnärliga friheten (guidance_scale 2.8) så att bakgrunden förblir akvarell!
+    console.log(`Skapar Flux-bild med Bild 1-formeln: ${finalPrompt}`);
+
     const isChild = finalPrompt.toLowerCase().includes("boy") || 
                     finalPrompt.toLowerCase().includes("girl") || 
                     finalPrompt.toLowerCase().includes("child") ||
                     finalPrompt.toLowerCase().includes("baby");
 
-    const activeLoraScale = isChild ? 0.98 : 0.85;
-    console.log(`Balanstest - Använder LoRA-skala: ${activeLoraScale} (Barn: ${isChild})`);
-
+    // Vi sätter skalan till 0.95 vilket ger perfekt Marlonsikt utan att spilla över till foto
+    const activeLoraScale = isChild ? 0.95 : 0.85;
+    
     const input: any = {
       prompt: finalPrompt,
       width: 1024,
       height: 768,
       num_inference_steps: 28, 
-      guidance_scale: 2.8, // Behåll det mjuka konstnärliga uttrycket för bakgrunden     
+      guidance_scale: 2.8,     
       
       lora_weights: trainedModelId,
       lora_scale: activeLoraScale

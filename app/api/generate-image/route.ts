@@ -27,22 +27,22 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // 1. VI FINJUSTERAR DET PERFEKTA 2D-STILLÅSET (Lama/Ghibli-estetik):
-    // Vi lägger till extremt tydliga direktiv för att tvinga in ansikten i en handritad 2D-värld.
-    const finalPrompt = `Heartwarming 2D hand-drawn watercolor illustration, cozy Ghibli slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid realistic skin textures, avoid chibi style, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid dark moody colors.`;
+    // VI FINJUSTERAR DET PERFEKTA 2D-STILLÅSET:
+    // Vi beskriver bakgrunderna och dinosaurierna med Ghibli-akvarell,
+    // men vi kräver en stark och tydlig 2D-porträttering av MARLONTOK med hans verkliga ansiktsdrag!
+    const finalPrompt = `Cozy heartwarming 2D hand-drawn watercolor illustration, cozy Ghibli slice-of-life anime aesthetic. Main subject is a highly recognizable 2D drawing of MARLONTOK, showing his actual facial features, authentic eyes, and natural hairstyle. Beautiful soft watercolor background textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid generic cartoon face, avoid doll face, avoid round chibi faces, avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid realistic skin textures, avoid 3D render, avoid CGI.`;
 
-    console.log(`Skapar Flux-bild med perfekt stilbalansering: ${finalPrompt}`);
+    console.log(`Skapar Flux-bild med perfekt likhet och Ghibli-stil: ${finalPrompt}`);
 
-    // 2. EXKLUSIV LIKHETS-BALANSERING (Vågskålen mellan Stil & Likhet):
-    // Vi sänker skalan något för att förhindra "fotoläckage" (att bilden blir ett riktigt foto).
-    // - 0.85 för barn (Marlon-sweetspoten som ger perfekt likhet men behåller teckningsstilen).
-    // - 0.80 för vuxna.
+    // DYNAMISK LIKHETS-BOOST (SaaS-Guldstandard):
+    // Vi höjer skalan till 0.98 för barn för att tvinga fram Marlons unika ansikte,
+    // men håller kvar den konstnärliga friheten (guidance_scale 2.8) så att bakgrunden förblir akvarell!
     const isChild = finalPrompt.toLowerCase().includes("boy") || 
                     finalPrompt.toLowerCase().includes("girl") || 
                     finalPrompt.toLowerCase().includes("child") ||
                     finalPrompt.toLowerCase().includes("baby");
 
-    const activeLoraScale = isChild ? 0.85 : 0.80;
+    const activeLoraScale = isChild ? 0.98 : 0.85;
     console.log(`Balanstest - Använder LoRA-skala: ${activeLoraScale} (Barn: ${isChild})`);
 
     const input: any = {
@@ -50,10 +50,7 @@ export async function POST(request: Request) {
       width: 1024,
       height: 768,
       num_inference_steps: 28, 
-      
-      // 3. DEN GYLLENE REGELN FÖR STYLADE LORAs:
-      // Vi sänker guidance_scale till 2.8 för att ge Flux mer utrymme att följa vår konstnärliga akvarellstil!
-      guidance_scale: 2.8,     
+      guidance_scale: 2.8, // Behåll det mjuka konstnärliga uttrycket för bakgrunden     
       
       lora_weights: trainedModelId,
       lora_scale: activeLoraScale

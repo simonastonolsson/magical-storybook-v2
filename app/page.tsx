@@ -8,6 +8,9 @@ export default function Page() {
   const [comic, setComic] = useState<any>(null);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
   
+  // DYNAMISKT SIDANTAL STATE (4, 8, 12, 16)
+  const [pageCount, setPageCount] = useState<number>(12); // Standard är 12 sidor
+  
   // PRIMÄR KARAKTÄR STATE (DIG)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
@@ -268,7 +271,8 @@ export default function Page() {
           characterDescription: charDesc,
           secondaryName: companionName || null,
           secondaryTrigger: secondaryDescription || null,
-          secondaryTriggerWord: useCustomCompanionAI ? companionTriggerWord : null
+          secondaryTriggerWord: useCustomCompanionAI ? companionTriggerWord : null,
+          pageCount: pageCount // Skicka med det dynamiska sidantalet till backend!
         }),
       });
 
@@ -341,21 +345,18 @@ export default function Page() {
     }
   };
 
-  // KLIENT-SÄKER PDF GENERERING VIA WEBBLÄSARENS PRINT-MOTOR
   const handleDownloadPDF = () => {
     window.print();
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8 text-center bg-gradient-to-b from-purple-50 to-pink-50 font-sans">
-      {/* INBYGGD PRINT-STYLING FÖR ATT GÖRA PDF-UTSKRIFTEN HELT PERFEKT OCH PROFESSIONELL */}
       <style>{`
         @media print {
           body {
             background: white !important;
             color: black !important;
           }
-          /* Dölj alla knappar, uppladdningsrutor, formulär och textfält */
           main > div:first-of-type,
           main > .w-full.max-w-2xl,
           .mt-2.flex,
@@ -364,19 +365,16 @@ export default function Page() {
           footer, header {
             display: none !important;
           }
-          /* Gör comic book-behållaren till helsida */
           .mt-16 {
             margin-top: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
           }
-          /* Formatera galleriet till en snygg boklayout */
           .grid {
             display: grid !important;
             grid-template-cols: 1fr 1fr !important;
             gap: 20px !important;
           }
-          /* Se till att bilderna inte bryts fult mitt på en sida */
           .grid > div {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -396,11 +394,8 @@ export default function Page() {
       </div>
 
       <div className="w-full max-w-2xl space-y-6">
-        
-        {/* STEG 1: BILDUPPLADDNING OCH DYNAMISKA INSTÄLLNINGAR */}
         <div className="rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left space-y-4">
           <h3 className="text-lg font-bold text-gray-800 mb-2">📸 Step 1: Train Main AI Character</h3>
-          
           <div className="grid grid-cols-2 gap-3 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
             <div>
               <label className="block text-xs font-bold text-purple-900 mb-1">Namn</label>
@@ -429,7 +424,6 @@ export default function Page() {
           </div>
 
           <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" />
-          
           <div className="flex flex-col gap-4 pt-2">
             <div className="flex items-center gap-4">
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null} className="px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold rounded-full transition disabled:opacity-50">
@@ -460,11 +454,9 @@ export default function Page() {
           </div>
         </div>
 
-        {/* HYBRID VÄLJARE FÖR FÖLJESLAGARE */}
         <div className={`rounded-[2rem] border-4 border-dashed border-blue-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <h3 className="text-lg font-bold text-gray-800 mb-1">🐕 Lägg till en kompis eller ett husdjur</h3>
           <p className="text-xs text-gray-500 mb-4">Vem vill du ska följa med på äventyret?</p>
-          
           <div className="flex gap-2 mb-4">
             {[
               { type: 'none', label: 'Bara jag 👤' },
@@ -544,9 +536,31 @@ export default function Page() {
           )}
         </div>
 
+        {/* STEG 2: BESKRIV ÄVENTYRET OCH VÄLJ BOKENS LÄNGD */}
         <div className={`relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity ${!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">📝 Step 2: Describe the adventure</h3>
-          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800" placeholder="e.g. Simon and Aston going on an exciting flight simulator ride..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
+          <h3 className="text-lg font-bold text-gray-800 mb-1">📝 Step 2: Describe the adventure</h3>
+          <p className="text-xs text-gray-500 mb-4">Välj hur många sidor din seriebok ska bestå av:</p>
+          
+          {/* NY PROAKTIV DESIGN: INTERAKTIV SIDVÄLJARE */}
+          <div className="flex gap-2 mb-4">
+            {[
+              { count: 4, label: '4 Sidor 📄', desc: 'Teaser' },
+              { count: 8, label: '8 Sidor 📚', desc: 'Mellanstor' },
+              { count: 12, label: '12 Sidor 📘', desc: 'Fyllig' },
+              { count: 16, label: '16 Sidor 📖', desc: 'Helbok' }
+            ].map((opt) => (
+              <button
+                key={opt.count}
+                onClick={() => setPageCount(opt.count)}
+                className={`flex-1 py-2 px-3 text-sm font-bold rounded-xl border-2 transition flex flex-col items-center justify-center ${pageCount === opt.count ? 'bg-purple-600 text-white border-purple-700 shadow-md' : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200'}`}
+              >
+                <span>{opt.label}</span>
+                <span className="text-[10px] opacity-70 font-medium">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <textarea rows={4} className="w-full bg-transparent text-lg placeholder:text-gray-500 focus:outline-none text-gray-800 border-t pt-4 border-purple-100" placeholder="e.g. Simon and Aston going on an exciting flight simulator ride..." value={memory} onChange={(e) => setMemory(e.target.value)} disabled={isLoadingScript || !trainedModelId} />
         </div>
 
         <button type="button" onClick={handleCreateStory} disabled={isLoadingScript || !trainedModelId} className="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-xl font-bold text-white hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100">

@@ -26,11 +26,14 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // INTELLIGENT KEYWORD-INTERCEPTION (SaaS-Magi):
-    // Vi skannar prompten efter hög-bias ord som "sportbil", "car", "basketball" etc.
-    // som brukar dra ner stilen till plastig 3D/CGI, och tvingar dem att bli tecknade!
+    // 1. FÖREBYGG DUBBELGÅNGARE-BUGGEN (Preventing Marlon Clone/Duplication):
+    // Eftersom vi redan lägger till MARLONTOK i huvudprompten, rensar vi bort eventuella dubbletter 
+    // av "Marlon" eller "MARLONTOK" i bakgrundsbeskrivningen (cleanedPrompt) så att han inte ritas två gånger!
+    cleanedPrompt = cleanedPrompt.replace(/marlontok/gi, "");
+    cleanedPrompt = cleanedPrompt.replace(/marlon/gi, "the boy");
+
+    // INTELLIGENT KEYWORD-INTERCEPTION:
     let lowerPrompt = cleanedPrompt.toLowerCase();
-    
     if (lowerPrompt.includes("sportbil") || lowerPrompt.includes("sports car") || lowerPrompt.includes("car")) {
       cleanedPrompt = cleanedPrompt.replace(/sports car|sportbil|car/gi, "whimsical vintage hand-drawn 2D watercolor red car");
     }
@@ -39,12 +42,11 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "charming hand-drawn watercolor basketball");
     }
 
-    // EXKLUSIVT RECEPT FÖR BILD 1-KVALITET:
-    // Vi lånar de exakta egenskaperna från Bild 1: "soft pencil sketch", "charming storybook illustration", 
-    // "muted watercolor washes", "detailed face with realistic child features".
-    const finalPrompt = `Cozy heartwarming 2D hand-drawn watercolor children's storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines. Main subject is a highly recognizable, detailed 2D portrait of MARLONTOK as a young boy with his actual realistic child facial features, authentic detailed eyes, and natural hairstyle. Placed in a cozy, soft-textured environment: ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid chibi doll face, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid plastic 3D CGI, avoid glossy renders, avoid TV-game graphics, avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid dark moody colors.`;
+    // EXKLUSIVT RECEPT FÖR BILD 1-KVALITET & NO-DUPLICATES:
+    // Vi lägger till "single child", "one boy only" för att tvinga fram endast en karaktär i scenen!
+    const finalPrompt = `Cozy heartwarming 2D hand-drawn watercolor children's storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines. Main subject is a single, highly recognizable, detailed 2D portrait of MARLONTOK as a young boy with his actual realistic child facial features, authentic detailed eyes, and natural hairstyle. Placed in a cozy, soft-textured environment: ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid duplicates, avoid double characters, avoid clones, avoid sibling face, avoid chibi doll face, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid plastic 3D CGI, avoid glossy renders, avoid TV-game graphics, avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid dark moody colors.`;
 
-    console.log(`Skapar Flux-bild med Bild 1-formeln: ${finalPrompt}`);
+    console.log(`Skapar Flux-bild med Bild 1-formeln och anti-dubblett-spärr: ${finalPrompt}`);
 
     const isChild = finalPrompt.toLowerCase().includes("boy") || 
                     finalPrompt.toLowerCase().includes("girl") || 

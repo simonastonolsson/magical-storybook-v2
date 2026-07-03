@@ -27,28 +27,33 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // VI FÖRSTÄRKER DESIGN-STILEN (Lama-stil):
-    // Vi lägger till stenhårda krav på naturliga ansiktsproportioner ("natural facial features", "finely detailed realistic eyes")
-    // för att hindra att starka objekt som bilar förvandlar karaktären till en generisk 3D-docka eller Chibi.
-    const finalPrompt = `Cozy hand-drawn indie graphic novel illustration style, charming heartwarming slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, natural facial proportions, finely detailed eyes, authentic face expression, high quality heartwarming art, beautifully colored, warm and inviting cozy atmosphere. Avoid chibi style, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid photorealism, avoid dark moody colors.`;
+    // 1. VI FINJUSTERAR DET PERFEKTA 2D-STILLÅSET (Lama/Ghibli-estetik):
+    // Vi lägger till extremt tydliga direktiv för att tvinga in ansikten i en handritad 2D-värld.
+    const finalPrompt = `Heartwarming 2D hand-drawn watercolor illustration, cozy Ghibli slice-of-life anime aesthetic, beautiful soft watercolor textures, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, ${cleanedPrompt}, high quality heartwarming 2D art, beautifully colored, warm and inviting cozy atmosphere. Avoid photo, avoid real-world photograph, avoid camera shot, avoid photorealism, avoid realistic skin textures, avoid chibi style, avoid giant circular black button eyes, avoid simplified cartoon faces, avoid high contrast superhero comic book style, avoid bold thick black outlines, avoid flat digital vector art, avoid 3D render, avoid CGI, avoid dark moody colors.`;
 
-    console.log(`Skapar Flux-bild med den exklusiva mysiga 2D-stilen (Lama-stil): ${finalPrompt}`);
+    console.log(`Skapar Flux-bild med perfekt stilbalansering: ${finalPrompt}`);
 
-    // DYNAMISK LIKHETS-BOOST:
+    // 2. EXKLUSIV LIKHETS-BALANSERING (Vågskålen mellan Stil & Likhet):
+    // Vi sänker skalan något för att förhindra "fotoläckage" (att bilden blir ett riktigt foto).
+    // - 0.85 för barn (Marlon-sweetspoten som ger perfekt likhet men behåller teckningsstilen).
+    // - 0.80 för vuxna.
     const isChild = finalPrompt.toLowerCase().includes("boy") || 
                     finalPrompt.toLowerCase().includes("girl") || 
                     finalPrompt.toLowerCase().includes("child") ||
                     finalPrompt.toLowerCase().includes("baby");
 
-    const activeLoraScale = isChild ? 1.15 : 1.0;
-    console.log(`Använder LoRA-skala: ${activeLoraScale} (Barn-boost aktiv: ${isChild})`);
+    const activeLoraScale = isChild ? 0.85 : 0.80;
+    console.log(`Balanstest - Använder LoRA-skala: ${activeLoraScale} (Barn: ${isChild})`);
 
     const input: any = {
       prompt: finalPrompt,
       width: 1024,
       height: 768,
       num_inference_steps: 28, 
-      guidance_scale: 3.5,     
+      
+      // 3. DEN GYLLENE REGELN FÖR STYLADE LORAs:
+      // Vi sänker guidance_scale till 2.8 för att ge Flux mer utrymme att följa vår konstnärliga akvarellstil!
+      guidance_scale: 2.8,     
       
       lora_weights: trainedModelId,
       lora_scale: activeLoraScale

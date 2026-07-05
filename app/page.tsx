@@ -19,6 +19,8 @@ export default function Page() {
   const [charDesc, setCharacterDescription] = useState('an adult man');
   const [charTrigger, setCharacterTrigger] = useState('SIMONTOK');
 
+  const [charOutfit, setCharOutfit] = useState('');
+  const [customOutfit, setCustomOutfit] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
@@ -49,6 +51,8 @@ export default function Page() {
       setTrainedModelId(savedModel);
       setTrainingStatus('Hittade din sparade AI-modell! Redo att skapa berattelser.');
     }
+    const savedOutfit = localStorage.getItem('my_saved_outfit');
+    if (savedOutfit) setCharOutfit(savedOutfit);
     const savedRefImage = localStorage.getItem('my_saved_reference_image');
     if (savedRefImage) {
       setReferenceImageUrl(savedRefImage);
@@ -315,6 +319,7 @@ export default function Page() {
           triggerWord: charTrigger,
           charDesc: charDesc,
           charName: charName,
+          charOutfit: customOutfit || charOutfit,
           referenceImageUrl: referenceImageUrl,
           extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
           extraLoraScale: 0.8
@@ -514,6 +519,42 @@ export default function Page() {
               )}
             </div>
           )}
+        </div>
+
+        <div className={"rounded-[2rem] border-4 border-dashed border-yellow-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity " + (!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100')}>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">👗 Step 2: Choose outfit</h3>
+          <p className="text-xs text-gray-500 mb-4">Vilken outfit ska din karaktar ha genom hela boken?</p>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {(charDesc.includes('boy') || charDesc.includes('girl') || charDesc.includes('child') || charDesc.includes('baby') ? [
+              { value: 'jeans and a cozy sweater, round neckline', label: 'Vardaglig 👕' },
+              { value: 'superhero cape and mask, colorful costume', label: 'Superhjalte 🦸' },
+              { value: 'khaki cargo pants and adventure jacket with backpack', label: 'Aventyrare 🎒' },
+              { value: 'cozy pajamas with star pattern', label: 'Pyjamas 🌙' },
+            ] : [
+              { value: 'jeans and a plain t-shirt, crew-neck, casual style', label: 'Casual 👕' },
+              { value: 'chinos and button-up shirt, smart casual style, crew-neck', label: 'Smart casual 👔' },
+              { value: 'hoodie and jogger pants, streetwear style', label: 'Street 🧢' },
+              { value: 'suit and tie, elegant formal style', label: 'Elegant 🤵' },
+            ]).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => { setCharOutfit(opt.value); setCustomOutfit(''); localStorage.setItem('my_saved_outfit', opt.value); }}
+                className={"py-2 px-4 text-sm font-bold rounded-xl border-2 transition " + (charOutfit === opt.value && !customOutfit ? 'bg-yellow-400 text-black border-yellow-500' : 'bg-yellow-50 hover:bg-yellow-100 text-yellow-800 border-yellow-200')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3">
+            <label className="block text-xs font-bold text-gray-600 mb-1">Eller beskriv din egen outfit:</label>
+            <input
+              type="text"
+              placeholder="t.ex. röd hoodie och svarta jeans..."
+              className="w-full px-3 py-2 text-sm bg-white border border-yellow-200 rounded-lg text-gray-800 focus:outline-none focus:border-yellow-400"
+              value={customOutfit}
+              onChange={(e) => { setCustomOutfit(e.target.value); setCharOutfit(''); }}
+            />
+          </div>
         </div>
 
         <div className={"relative rounded-[2rem] border-4 border-dashed border-purple-300/70 bg-white/80 p-6 shadow-xl backdrop-blur text-left transition-opacity " + (!trainedModelId ? 'opacity-50 pointer-events-none' : 'opacity-100')}>

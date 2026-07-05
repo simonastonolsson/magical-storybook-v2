@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       ? "wearing a cozy yellow raincoat and blue denim jeans"
       : "wearing a classic navy blue sweater and dark grey trousers";
 
-    const characterAnchor = `${triggerWord || 'TOK'}, ${charDesc || 'a person'}, ${signatureOutfit}`;
+    const characterAnchor = (triggerWord || 'TOK') + ', ' + (charDesc || 'a person') + ', ' + signatureOutfit;
 
     let cleanedPrompt = prompt || "";
 
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       const matches = cleanedPrompt.match(triggerRegex) || [];
       if (matches.length > 1) {
         let count = 0;
-        cleanedPrompt = cleanedPrompt.replace(triggerRegex, (match) => {
+        cleanedPrompt = cleanedPrompt.replace(triggerRegex, (match: string) => {
           count++;
           return count === 1 ? match : "the character";
         });

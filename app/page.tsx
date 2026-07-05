@@ -219,7 +219,7 @@ export default function Page() {
       setCurrentlyGeneratingPanel(panel.panel_number);
       if (i > 0) await delay(3000);
       try {
-        const response = await fetch('/api/generate-image-fal', {
+        const response = await fetch('/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -306,7 +306,7 @@ export default function Page() {
       if (!refineRes.ok) throw new Error("Failed to refine prompt");
       const refineData = await refineRes.json();
       const newPrompt = refineData.refinedPrompt;
-      const response = await fetch('/api/generate-image-fal', {
+      const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

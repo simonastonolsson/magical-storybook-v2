@@ -5,7 +5,7 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN } as any
 
 export async function POST(request: Request) {
   try {
-    const { prompt, trainedModelId, triggerWord, charDesc, extraLoraId, extraLoraScale } = await request.json();
+    const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, extraLoraId, extraLoraScale } = await request.json();
 
     if (!trainedModelId) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
@@ -16,11 +16,13 @@ export async function POST(request: Request) {
                     charDesc?.toLowerCase().includes("child") ||
                     charDesc?.toLowerCase().includes("baby");
 
-    const signatureOutfit = isChild
+    const defaultOutfit = isChild
       ? "wearing a cozy yellow raincoat and blue denim jeans"
-      : "wearing a classic navy blue sweater and dark grey trousers";
+      : "wearing a classic navy blue crew-neck sweater with round neckline and dark grey trousers";
 
-    const characterAnchor = (triggerWord || 'TOK') + ', ' + (charDesc || 'a person') + ', ' + signatureOutfit;
+    const finalOutfit = charOutfit ? "wearing " + charOutfit : defaultOutfit;
+
+    const characterAnchor = (triggerWord || 'TOK') + ', ' + (charDesc || 'a person') + ', ' + finalOutfit;
 
     let cleanedPrompt = prompt || "";
 
@@ -56,13 +58,13 @@ export async function POST(request: Request) {
       "Main subject: " + characterAnchor + ", realistic facial features preserved from reference, " +
       "painted in warm natural light. Scene: " + cleanedPrompt + ". " +
       "Style: high quality digital painting, concept art, story illustration. " +
-      "Negative: photorealism, DSLR photo, 3D CGI, anime, chibi, flat colors, hard outlines, duplicates.";
+      "The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change.";
 
     console.log("Generating image:", finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,
-      negative_prompt: "photograph, photorealistic, camera shot, DSLR, 3D CGI, Pixar, anime, chibi, duplicate person, clone, blurry, hard black outlines, flat colors",
+      negative_prompt: "photograph, photorealistic, camera shot, DSLR, 3D CGI, Pixar, anime, chibi, duplicate person, clone, blurry, hard black outlines, flat colors, wrong outfit, different clothes",
       width: 1024,
       height: 768,
       num_inference_steps: 35,

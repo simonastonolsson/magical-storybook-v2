@@ -1,28 +1,44 @@
-// app/api/generate-image/route.ts
+import Replicate from 'replicate';
+import { NextResponse } from 'next/server';
+
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+} as any);
+
 export async function POST(request: Request) {
-  const { 
-    prompt, 
-    trainedModelId, 
-    triggerWord,        // ← lägg till
-    charDesc,           // ← lägg till  
-    charName,           // ← lägg till
-    extraLoraId, 
-    extraLoraScale 
-  } = await request.json();
+  try {
+    const { 
+      prompt, 
+      trainedModelId, 
+      triggerWord,
+      charDesc,
+      charName,
+      extraLoraId, 
+      extraLoraScale 
+    } = await request.json();
 
-  const isChild = charDesc?.toLowerCase().includes("boy") || 
-                  charDesc?.toLowerCase().includes("girl");
+    if (!trainedModelId) {
+      return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
+    }
 
-  const signatureOutfit = isChild
-    ? "wearing a cozy yellow raincoat and blue denim jeans"
-    : "wearing a classic navy blue sweater and dark grey trousers";
+    const isChild = charDesc?.toLowerCase().includes("boy") || 
+                    charDesc?.toLowerCase().includes("girl") ||
+                    charDesc?.toLowerCase().includes("child") ||
+                    charDesc?.toLowerCase().includes("baby");
 
-  // Bygg dynamisk anchor-beskrivning från karaktärsdata
-  const characterAnchor = `${triggerWord}, ${charDesc}, ${signatureOutfit}`;
-  
-  const finalPrompt = `Cozy heartwarming 2D hand-drawn watercolor storybook illustration, 
-soft pencil sketch details, warm pastel colors, gentle sunlit lighting.
-Main subject: highly recognizable portrait of ${characterAnchor}, 
-natural realistic facial features, actual hair color and eye color from training photos.
-Scene: ${prompt}
-Negative: blue eyes, anime face, chibi, 3D CGI, photorealism, duplicates, clones.`;
+    const signatureOutfit = isChild
+      ? "wearing a cozy yellow raincoat and blue denim jeans"
+      : "wearing a classic navy blue sweater and dark grey trousers";
+
+    const characterAnchor = `${triggerWord || 'TOK'}, ${charDesc || 'a person'}, ${signatureOutfit}`;
+
+    let cleanedPrompt = prompt || "";
+
+    // Ta bort style-prefix om Gemini redan lagt till det
+    const stylePrefixes = [
+      "Comic book panel illustration, graphic novel art,",
+      "Comic book panel illustration, graphic novel art"
+    ];
+    for (const prefix of stylePrefixes) {
+      if (cleanedPrompt.toLowerCase().startsWith(prefix.toLowerCase())) {
+        cleanedPrompt =

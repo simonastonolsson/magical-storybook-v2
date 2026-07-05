@@ -50,18 +50,25 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "hand-drawn watercolor basketball");
     }
 
-    const finalPrompt = "Cozy 2D hand-drawn watercolor storybook illustration, soft pencil sketch details, warm pastel colors, gentle sunlit lighting. Main subject: highly recognizable portrait of " + characterAnchor + ", natural realistic facial features, actual hair color and eye color from training photos. Scene: " + cleanedPrompt + ". Avoid: blue eyes, anime face, chibi, 3D CGI, photorealism, duplicates, clones.";
+    const finalPrompt = "Digital painted illustration, painterly art style, " +
+      "soft brush strokes, natural volumetric lighting, cinematic composition, " +
+      "detailed background environment, illustrated but NOT a photograph. " +
+      "Main subject: " + characterAnchor + ", realistic facial features preserved from reference, " +
+      "painted in warm natural light. Scene: " + cleanedPrompt + ". " +
+      "Style: high quality digital painting, concept art, story illustration. " +
+      "Negative: photorealism, DSLR photo, 3D CGI, anime, chibi, flat colors, hard outlines, duplicates.";
 
     console.log("Generating image:", finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,
+      negative_prompt: "photograph, photorealistic, camera shot, DSLR, 3D CGI, Pixar, anime, chibi, duplicate person, clone, blurry, hard black outlines, flat colors",
       width: 1024,
       height: 768,
-      num_inference_steps: 32,
-      guidance_scale: 4.0,
+      num_inference_steps: 35,
+      guidance_scale: 3.5,
       lora_weights: trainedModelId,
-      lora_scale: isChild ? 0.92 : 0.85
+      lora_scale: isChild ? 0.88 : 0.80
     };
 
     if (extraLoraId) {

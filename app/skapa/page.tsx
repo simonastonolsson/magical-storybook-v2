@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
+import { signOut } from '@/app/auth/actions';
 
 export default function Page() {
   const [step, setStep] = useState(1);
@@ -15,6 +16,7 @@ export default function Page() {
   const [trainingStatus, setTrainingStatus] = useState('');
   const [trainedModelId, setTrainedModelId] = useState<string | null>(null);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [savedModelDbId, setSavedModelDbId] = useState<string | null>(null);
 
   const [charName, setCharacterName] = useState('');
   const [charDesc, setCharacterDescription] = useState('an adult man');
@@ -46,13 +48,26 @@ export default function Page() {
   }, [charName]);
 
   useEffect(() => {
-    const savedModel = localStorage.getItem('my_saved_lora_model');
-    if (savedModel && savedModel.includes('/')) {
-      setTrainedModelId(savedModel);
-      setTrainingStatus('AI-modell hittad och redo!');
-    }
-    const savedRef = localStorage.getItem('my_saved_reference_image');
-    if (savedRef) setReferenceImageUrl(savedRef);
+    const loadSavedModel = async () => {
+      try {
+        const res = await fetch('/api/user-models');
+        if (!res.ok) return;
+        const { models } = await res.json();
+        const savedModel = models?.[0];
+        if (savedModel) {
+          setSavedModelDbId(savedModel.id);
+          setTrainedModelId(savedModel.model_path);
+          setReferenceImageUrl(savedModel.reference_image_url);
+          setCharacterName(savedModel.model_name);
+          setCharacterDescription(savedModel.char_desc || 'an adult man');
+          setTrainingStatus('AI-modell hittad och redo!');
+        }
+      } catch (err) {
+        console.error('Failed to load saved model', err);
+      }
+    };
+    loadSavedModel();
+
     const savedCompanion = localStorage.getItem('my_saved_companion_lora_model');
     if (savedCompanion && savedCompanion.includes('/')) {
       setCompanionModelId(savedCompanion);
@@ -145,10 +160,28 @@ export default function Page() {
       setTrainingStatus('Sparar referensfoto...');
       const refUrl = await uploadReferenceImageToBlob(selectedFiles[0]);
       setReferenceImageUrl(refUrl);
-      localStorage.setItem('my_saved_reference_image', refUrl);
       const path = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger);
       setTrainedModelId(path);
-      localStorage.setItem('my_saved_lora_model', path);
+      setTrainingStatus('Sparar din AI-karaktar...');
+      try {
+        const saveRes = await fetch('/api/user-models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model_path: path,
+            model_name: charName || 'Min karaktar',
+            trigger_word: charTrigger,
+            char_desc: charDesc,
+            reference_image_url: refUrl,
+          }),
+        });
+        if (saveRes.ok) {
+          const { model } = await saveRes.json();
+          setSavedModelDbId(model.id);
+        }
+      } catch (saveErr) {
+        console.error('Failed to save model to account', saveErr);
+      }
       setTrainingStatus('Klart! Din AI-karaktar ar redo.');
     } catch (err) {
       console.error(err);
@@ -317,6 +350,8 @@ export default function Page() {
         .wiz-logo { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 900; color: #1a1a2e; text-decoration: none; }
         .wiz-logo span { color: #7c3aed; }
         .wiz-step-label { font-size: 0.85rem; color: #6b7280; font-weight: 500; }
+        .wiz-logout-btn { padding: 0.5rem 1rem; background: none; color: #6b7280; border: 1.5px solid #e5e0d8; border-radius: 100px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .wiz-logout-btn:hover { border-color: #1a1a2e; color: #1a1a2e; }
         .wiz-progress { height: 3px; background: #e5e0d8; position: fixed; top: 61px; left: 0; right: 0; z-index: 99; }
         .wiz-progress-bar { height: 100%; background: linear-gradient(90deg, #7c3aed, #f43f8e); transition: width 0.4s ease; }
         .wiz-body { max-width: 600px; margin: 0 auto; padding: 6rem 1.5rem 4rem; }
@@ -388,8 +423,13 @@ export default function Page() {
 
       <nav className="wiz-nav">
         <a href="/" className="wiz-logo">Story<span>labz</span></a>
-        {!comic && <span className="wiz-step-label">Steg {step} av {totalSteps}</span>}
-        {comic && <button className="pdf-btn" onClick={() => window.print()}>Ladda ner PDF</button>}
+        <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
+          {!comic && <span className="wiz-step-label">Steg {step} av {totalSteps}</span>}
+          {comic && <button className="pdf-btn" onClick={() => window.print()}>Ladda ner PDF</button>}
+          <form action={signOut}>
+            <button type="submit" className="wiz-logout-btn">Logga ut</button>
+          </form>
+        </div>
       </nav>
 
       {!comic && (
@@ -488,7 +528,16 @@ export default function Page() {
                   <div className={'wiz-status' + (trainedModelId ? ' wiz-success' : '')}>{trainingStatus}</div>
                 )}
                 {trainedModelId && (
-                  <button className="wiz-delete-link" onClick={() => { localStorage.removeItem('my_saved_lora_model'); localStorage.removeItem('my_saved_reference_image'); setTrainedModelId(null); setReferenceImageUrl(null); setTrainingStatus(''); }}>
+                  <button className="wiz-delete-link" onClick={async () => {
+                    if (savedModelDbId) {
+                      try { await fetch('/api/user-models/' + savedModelDbId, { method: 'DELETE' }); }
+                      catch (err) { console.error('Failed to delete saved model', err); }
+                    }
+                    setSavedModelDbId(null);
+                    setTrainedModelId(null);
+                    setReferenceImageUrl(null);
+                    setTrainingStatus('');
+                  }}>
                     Ta bort och trana ny karaktar
                   </button>
                 )}

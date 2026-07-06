@@ -21,6 +21,7 @@ export default function Page() {
   const [charTrigger, setCharacterTrigger] = useState('TOK');
   const [charOutfit, setCharOutfit] = useState('');
   const [customOutfit, setCustomOutfit] = useState('');
+  const [bookStyle, setBookStyle] = useState('digital_painting');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -267,6 +268,7 @@ export default function Page() {
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
+          bookStyle,
           referenceImageUrl,
           extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
           extraLoraScale: 0.8
@@ -436,6 +438,38 @@ export default function Page() {
               </div>
 
               <div className="wiz-card">
+                <label className="wiz-label">Bokens stil</label>
+                <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Vilken konstnärlig stil ska bilderna ha?</p>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem'}}>
+                  {[
+                    { value: 'digital_painting', label: 'Digital Painting', desc: 'Varm och cinematic', emoji: '🎨' },
+                    { value: 'ligne_claire', label: 'Ligne Claire', desc: 'Tintin-inspirerad', emoji: '✏️' },
+                    { value: 'american_comic', label: 'Amerikansk serie', desc: 'Marvel/DC-känsla', emoji: '💥' },
+                    { value: 'watercolor', label: 'Akvarell', desc: 'Mjuk barnboksstil', emoji: '🖌️' },
+                    { value: 'noir', label: 'Noir', desc: 'Svartvit bläckskiss', emoji: '🌑' },
+                    { value: 'pop_art', label: 'Pop Art', desc: 'Lichtenstein-stil', emoji: '🔴' },
+                  ].map((s) => (
+                    <button key={s.value} onClick={() => setBookStyle(s.value)} style={{
+                      padding: '0.9rem 1rem',
+                      borderRadius: '12px',
+                      border: bookStyle === s.value ? '2px solid #7c3aed' : '1.5px solid #e5e0d8',
+                      background: bookStyle === s.value ? '#ede9fe' : 'white',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s',
+                      display: 'flex',
+                      flexDirection: 'column' as const,
+                      gap: '0.2rem'
+                    }}>
+                      <span style={{fontSize:'1.3rem'}}>{s.emoji}</span>
+                      <span style={{fontSize:'0.88rem', fontWeight:'700', color: bookStyle === s.value ? '#7c3aed' : '#1a1a2e'}}>{s.label}</span>
+                      <span style={{fontSize:'0.75rem', color:'#6b7280'}}>{s.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="wiz-card">
                 <label className="wiz-label">Foton (minst 5)</label>
                 <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Ladda upp selfies eller portrattbilder dar ansiktet syns tydligt. Fler bilder = battre likhet.</p>
                 <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" style={{display:'none'}} />
@@ -546,6 +580,7 @@ export default function Page() {
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Karaktar</span><span className="wiz-summary-val">{charName || 'Ej angett'}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Typ</span><span className="wiz-summary-val">{charDesc}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Outfit</span><span className="wiz-summary-val">{customOutfit || charOutfit || 'Standard'}</span></div>
+                <div className="wiz-summary-row"><span className="wiz-summary-key">Stil</span><span className="wiz-summary-val">{{digital_painting:'Digital Painting',ligne_claire:'Ligne Claire',american_comic:'Amerikansk serie',watercolor:'Akvarell',noir:'Noir',pop_art:'Pop Art'}[bookStyle]}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Foljslagare</span><span className="wiz-summary-val">{companionType === 'none' ? 'Ingen' : (companionName || companionType)}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Sidor</span><span className="wiz-summary-val">{pageCount} sidor</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">AI-modell</span><span className="wiz-summary-val">{trainedModelId ? 'Redo' : 'Saknas'}</span></div>

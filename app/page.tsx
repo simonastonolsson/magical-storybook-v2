@@ -170,7 +170,6 @@ export default function Home() {
         <div className="testimonial-grid">
           <div className="testimonial"><div className="stars">★★★★★</div><p>"Gav detta som present till min son på hans födelsedag. Han blev helt tagen – att se sig själv som hjälten i en seriebok var magiskt."</p><div className="testimonial-author"><div className="avatar" style={{background:'#ede9fe'}}>👩</div><div><div className="author-name">Anna K.</div><div className="author-role">Mamma till en 8-åring</div></div></div></div>
           <div className="testimonial"><div className="stars">★★★★★</div><p>"Fantastisk bröllopspresent. Vi skapade en bok om vår Tinderresa – från första swipe till vigseln. Alla gäster ville se den."</p><div className="testimonial-author"><div className="avatar" style={{background:'#fdf3d0'}}>🧔</div><div><div className="author-name">Marcus L.</div><div className="author-role">Brudgum</div></div></div></div>
-          <div className="testimonial"><div className="stars">★★★★★</div><p>"Tog ungefär 10 minuter att skapa och resultatet var häpnadsväckande. Likheterna var otroliga – det är verkligen jag i bilderna."</p><div className="testimonial-author"><div className="avatar" style={{background:'#fce7f3'}}>👱‍♀️</div><div><div className="author-name">Sara M.</div><div className="author-role">Designer</div></div></div></div>
         </div>
       </section>
 

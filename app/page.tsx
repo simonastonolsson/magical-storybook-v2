@@ -74,7 +74,7 @@ export default function Home() {
         .features { list-style: none; text-align: left; margin-bottom: 2rem; }
         .features li { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; font-size: 0.95rem; border-bottom: 1px solid var(--border); }
         .features li:last-child { border-bottom: none; }
-        .features li::before { content: '✓'; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--purple-light); color: var(--purple); border-radius: 50%; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+        .features li::before { content: 'check'; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--purple-light); color: var(--purple); border-radius: 50%; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
         .testimonials { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
         .testimonial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
         .testimonial { background: white; border: 1.5px solid var(--border); border-radius: 20px; padding: 1.75rem; }
@@ -102,43 +102,43 @@ export default function Home() {
         <div>
           <a href="#how">Hur det fungerar</a>
           <a href="#pris">Pris</a>
-          <Link href="/skapa" className="nav-cta">Skapa din bok →</Link>
+          <Link href="/skapa" className="nav-cta">Skapa din bok</Link>
         </div>
       </nav>
 
       <section className="hero">
         <div className="hero-bg"></div>
-        <div className="hero-badge">✨ AI-genererade personliga böcker</div>
+        <div className="hero-badge">AI-genererade personliga bocker</div>
         <h1>Din story.<br /><em>Ditt ansikte.</em><br />Din bok.</h1>
-        <p>Ladda upp några foton – AI:n skapar en personlig seriebok med dig som stjärna. Perfekt present eller minnessak du aldrig glömmer.</p>
+        <p>Ladda upp nagra foton - AI:n skapar en personlig seriebok med dig som stjarna. Perfekt present eller minnessak du aldrig glommar.</p>
         <div className="hero-actions">
-          <Link href="/skapa" className="btn-primary">Skapa din bok – 299 kr →</Link>
+          <Link href="/skapa" className="btn-primary">Skapa din bok - 299 kr</Link>
           <a href="#how" className="btn-secondary">Hur fungerar det?</a>
         </div>
         <div className="hero-note">30 sidor · Ladda ner som PDF · Inga prenumerationer</div>
         <div className="book-strip">
-          <div className="book-card"><div className="book-card-img">🚀</div><div className="book-card-label">Månresan</div></div>
-          <div className="book-card"><div className="book-card-img">🦁</div><div className="book-card-label">Safari-äventyret</div></div>
-          <div className="book-card"><div className="book-card-img">🏔️</div><div className="book-card-label">Bergsklättringen</div></div>
+          <div className="book-card"><div className="book-card-img">🚀</div><div className="book-card-label">Manresan</div></div>
+          <div className="book-card"><div className="book-card-img">🦁</div><div className="book-card-label">Safari-aventyret</div></div>
+          <div className="book-card"><div className="book-card-img">🏔️</div><div className="book-card-label">Bergsklattringen</div></div>
           <div className="book-card"><div className="book-card-img">🐉</div><div className="book-card-label">Drakarnas dal</div></div>
         </div>
       </section>
 
       <div className="stats">
         <div className="stat"><div className="stat-number">30</div><div className="stat-label">Sidor per bok</div></div>
-        <div className="stat"><div className="stat-number">~10 min</div><div className="stat-label">Från idé till färdig bok</div></div>
+        <div className="stat"><div className="stat-number">~10 min</div><div className="stat-label">Fran ide till fardig bok</div></div>
         <div className="stat"><div className="stat-number">299 kr</div><div className="stat-label">Fast pris, inga dolda avgifter</div></div>
-        <div className="stat"><div className="stat-number">100%</div><div className="stat-label">Unik – skapad bara för dig</div></div>
+        <div className="stat"><div className="stat-number">100%</div><div className="stat-label">Unik - skapad bara for dig</div></div>
       </div>
 
       <section className="section" id="how">
-        <div className="section-eyebrow">Så här fungerar det</div>
+        <div className="section-eyebrow">Sa har fungerar det</div>
         <div className="section-title">Tre steg till din personliga bok</div>
-        <p className="section-sub">Inga tekniska kunskaper behövs. Du väljer äventyret – AI:n gör jobbet.</p>
+        <p className="section-sub">Inga tekniska kunskaper behovs. Du valjer aventyret - AI:n gor jobbet.</p>
         <div className="steps">
-          <div className="step"><div className="step-icon purple">📸</div><h3>1. Ladda upp dina foton</h3><p>Välj 5–15 selfies eller bilder på den du vill sätta i boken. AI:n lär sig utseendet och skapar din unika karaktär.</p></div>
-          <div className="step"><div className="step-icon gold">✍️</div><h3>2. Beskriv äventyret</h3><p>Skriv vad du vill att boken ska handla om. "En resa till månen", "En dag på safari" – din fantasi sätter gränsen.</p></div>
-          <div className="step"><div className="step-icon pink">📖</div><h3>3. Ladda ner din bok</h3><p>AI:n genererar 30 sidor med bilder och berättelse där du är stjärnan. Ladda ner som PDF – redo att läsas eller tryckas.</p></div>
+          <div className="step"><div className="step-icon purple">📸</div><h3>1. Ladda upp dina foton</h3><p>Valj 5-15 selfies eller bilder pa den du vill satta i boken. AI:n lar sig utseendet och skapar din unika karaktar.</p></div>
+          <div className="step"><div className="step-icon gold">✍️</div><h3>2. Beskriv aventyret</h3><p>Skriv vad du vill att boken ska handla om. En resa till manen, en dag pa safari - din fantasi satter gransen.</p></div>
+          <div className="step"><div className="step-icon pink">📖</div><h3>3. Ladda ner din bok</h3><p>AI:n genererar 30 sidor med bilder och berattelse dar du ar stjarnan. Ladda ner som PDF - redo att lasas eller tryckas.</p></div>
         </div>
       </section>
 
@@ -146,54 +146,55 @@ export default function Home() {
         <div className="pricing-inner">
           <div className="section-eyebrow">Pris</div>
           <div className="section-title">En bok. Ett pris.</div>
-          <p className="section-sub">Inga prenumerationer, inga överraskningar. Betala en gång, få din unika bok.</p>
+          <p className="section-sub">Inga prenumerationer, inga overraskningar. Betala en gang, fa din unika bok.</p>
           <div className="pricing-card">
-            <div className="pricing-badge">Mest populär</div>
+            <div className="pricing-badge">Mest popular</div>
             <div className="price"><span>kr</span>299</div>
-            <div className="price-note">per bok · engångsbetalning</div>
+            <div className="price-note">per bok - engangbetalning</div>
             <ul className="features">
               <li>30 sidor med AI-genererade bilder</li>
-              <li>Du som huvudkaraktär i varje scen</li>
-              <li>Valfritt äventyr och berättelse</li>
-              <li>Lägg till kompis eller husdjur</li>
+              <li>Du som huvudkaraktar i varje scen</li>
+              <li>Valfritt aventyr och berattelse</li>
+              <li>Lagg till kompis eller husdjur</li>
               <li>Ladda ner som PDF direkt</li>
               <li>Redigera text och rita om bilder</li>
             </ul>
-            <Link href="/skapa" className="btn-primary" style={{width:'100%', justifyContent:'center'}}>Skapa din bok nu →</Link>
+            <Link href="/skapa" className="btn-primary" style={{width:'100%', justifyContent:'center'}}>Skapa din bok nu</Link>
           </div>
         </div>
       </section>
 
       <section className="testimonials">
         <div className="section-eyebrow">Recensioner</div>
-        <div className="section-title">Vad folk säger</div>
+        <div className="section-title">Vad folk sager</div>
         <div className="testimonial-grid">
-          <div className="testimonial"><div className="stars">★★★★★</div><p>"Gav detta som present till min son på hans födelsedag. Han blev helt tagen – att se sig själv som hjälten i en seriebok var magiskt."</p><div className="testimonial-author"><div className="avatar" style={{background:'#ede9fe'}}>👩</div><div><div className="author-name">Anna K.</div><div className="author-role">Mamma till en 8-åring</div></div></div></div>
-          <div className="testimonial"><div className="stars">★★★★★</div><p>"Fantastisk bröllopspresent. Vi skapade en bok om vår Tinderresa – från första swipe till vigseln. Alla gäster ville se den."</p><div className="testimonial-author"><div className="avatar" style={{background:'#fdf3d0'}}>🧔</div><div><div className="author-name">Marcus L.</div><div className="author-role">Brudgum</div></div></div></div>
+          <div className="testimonial"><div className="stars">★★★★★</div><p>Gav detta som present till min son pa hans fodelsedag. Han blev helt tagen - att se sig sjalv som hjalten i en seriebok var magiskt.</p><div className="testimonial-author"><div className="avatar" style={{background:'#ede9fe'}}>👩</div><div><div className="author-name">Anna K.</div><div className="author-role">Mamma till en 8-aring</div></div></div></div>
+          <div className="testimonial"><div className="stars">★★★★★</div><p>Fantastisk brollopspresent. Vi skapade en bok om var Tinderresa - fran forsta swipe till vigseln. Alla gaster ville se den.</p><div className="testimonial-author"><div className="avatar" style={{background:'#fdf3d0'}}>🧔</div><div><div className="author-name">Marcus L.</div><div className="author-role">Brudgum</div></div></div></div>
+          <div className="testimonial"><div className="stars">★★★★★</div><p>Perfekt 40-arspresent till min basta van. Hon grat av lycka nar hon sag sig sjalv som hjaltinna i ett rymdaventyr. Kommer bestalla fler!</p><div className="testimonial-author"><div className="avatar" style={{background:'#fce7f3'}}>👱‍♀️</div><div><div className="author-name">Sara M.</div><div className="author-role">Kopte som present</div></div></div></div>
         </div>
       </section>
 
       <section className="faq-section">
         <div className="faq-inner">
-          <div className="section-eyebrow" style={{textAlign:'center'}}>Vanliga frågor</div>
-          <div className="section-title" style={{textAlign:'center', margin:'0 auto 2.5rem'}}>Har du frågor?</div>
-          <div className="faq-item"><div className="faq-q">Hur lika ser karaktären ut mig?</div><div className="faq-a">AI:n tränas på dina foton och lär sig ditt ansikte, hår och ansiktsdrag. Resultatet är imponerande likt – ju fler och varierade foton du laddar upp, desto bättre.</div></div>
-          <div className="faq-item"><div className="faq-q">Hur lång tid tar det?</div><div className="faq-a">AI-träningen tar 5–10 minuter. Sedan genereras bilderna löpande medan du väntar – normalt är hela boken klar inom 15–20 minuter.</div></div>
-          <div className="faq-item"><div className="faq-q">Kan jag lägga till barn eller husdjur?</div><div className="faq-a">Ja! Du kan lägga till en kompis, ett barn, en hund eller en katt som följeslagare i äventyret.</div></div>
-          <div className="faq-item"><div className="faq-q">Vad händer med mina foton?</div><div className="faq-a">Dina foton används enbart för att träna AI-modellen och raderas sedan. Vi säljer eller delar aldrig din data med tredje part.</div></div>
-          <div className="faq-item"><div className="faq-q">Kan jag beställa en tryckt bok?</div><div className="faq-a">Just nu levererar vi som PDF som du enkelt kan skriva ut hemma eller hos ett tryckeri. Tryckt bok-alternativ kommer snart.</div></div>
+          <div className="section-eyebrow" style={{textAlign:'center'}}>Vanliga fragor</div>
+          <div className="section-title" style={{textAlign:'center', margin:'0 auto 2.5rem'}}>Har du fragor?</div>
+          <div className="faq-item"><div className="faq-q">Hur lika ser karaktaren ut mig?</div><div className="faq-a">AI:n tranas pa dina foton och lar sig ditt ansikte, har och ansiktsdrag. Resultatet ar imponerande likt - ju fler och varierade foton du laddar upp, desto battre.</div></div>
+          <div className="faq-item"><div className="faq-q">Hur lang tid tar det?</div><div className="faq-a">AI-traningen tar 5-10 minuter. Sedan genereras bilderna lopande medan du vantar - normalt ar hela boken klar inom 15-20 minuter.</div></div>
+          <div className="faq-item"><div className="faq-q">Kan jag lagga till barn eller husdjur?</div><div className="faq-a">Ja! Du kan lagga till en kompis, ett barn, en hund eller en katt som foljslagare i aventyret.</div></div>
+          <div className="faq-item"><div className="faq-q">Vad hander med mina foton?</div><div className="faq-a">Dina foton anvands enbart for att trana AI-modellen och raderas sedan. Vi saljer eller delar aldrig din data med tredje part.</div></div>
+          <div className="faq-item"><div className="faq-q">Kan jag bestalla en tryckt bok?</div><div className="faq-a">Just nu levererar vi som PDF som du enkelt kan skriva ut hemma eller hos ett tryckeri. Tryckt bok-alternativ kommer snart.</div></div>
         </div>
       </section>
 
       <section className="cta-banner">
-        <h2>Redo att bli en serietidningsstjärna?</h2>
-        <p>Skapa din personliga bok på 10 minuter. 299 kr – ingen prenumeration.</p>
-        <Link href="/skapa" className="btn-white">Kom igång nu →</Link>
+        <h2>Redo att bli en serietidningsstjarna?</h2>
+        <p>Skapa din personliga bok pa 10 minuter. 299 kr - ingen prenumeration.</p>
+        <Link href="/skapa" className="btn-white">Kom igang nu</Link>
       </section>
 
       <footer>
         <div className="logo">Story<span>labz</span></div>
-        <p style={{marginTop:'0.5rem'}}>© 2026 Storylabz · Skapad med ❤️ och AI</p>
+        <p style={{marginTop:'0.5rem'}}>2026 Storylabz</p>
       </footer>
     </>
   );

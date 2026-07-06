@@ -3,9 +3,48 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN } as any);
 
+const STYLE_PROMPTS: Record<string, { positive: string; negative: string; loraScale: number; loraScaleChild: number }> = {
+  digital_painting: {
+    positive: "digital painted illustration, painterly art style, soft brush strokes, natural volumetric lighting, cinematic composition, detailed background environment, high quality digital painting, concept art, story illustration",
+    negative: "photograph, photorealistic, DSLR, 3D CGI, Pixar, anime, chibi, flat colors, hard outlines, duplicates",
+    loraScale: 0.80,
+    loraScaleChild: 0.88
+  },
+  ligne_claire: {
+    positive: "ligne claire comic art style, clean precise ink outlines, flat cel colors, bright even lighting, clear readable panels, European bande dessinee style, Tintin inspired illustration, bold outlines, simple clean backgrounds",
+    negative: "photograph, photorealistic, 3D CGI, anime, shading, dark shadows, watercolor, rough textures, duplicates",
+    loraScale: 0.78,
+    loraScaleChild: 0.85
+  },
+  american_comic: {
+    positive: "American superhero comic book art, bold ink outlines, dynamic composition, strong contrasting colors, Marvel DC style illustration, halftone dots, dramatic lighting, action comic panel, professional comic art",
+    negative: "photograph, photorealistic, 3D CGI, anime, watercolor, soft colors, duplicates, blurry",
+    loraScale: 0.78,
+    loraScaleChild: 0.85
+  },
+  watercolor: {
+    positive: "cozy heartwarming 2D hand-drawn watercolor children storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
+    negative: "photograph, photorealistic, 3D CGI, Pixar, anime, chibi, hard outlines, flat digital colors, duplicates",
+    loraScale: 0.85,
+    loraScaleChild: 0.90
+  },
+  noir: {
+    positive: "black and white noir comic illustration, high contrast ink drawing, dramatic shadows, cross-hatching technique, graphic novel art style, Sin City inspired, expressive ink lines, moody atmosphere, detailed pen and ink illustration",
+    negative: "color, photograph, photorealistic, 3D CGI, anime, watercolor, pastel colors, duplicates",
+    loraScale: 0.78,
+    loraScaleChild: 0.85
+  },
+  pop_art: {
+    positive: "Roy Lichtenstein pop art comic style, bold black outlines, Ben-Day dots pattern, primary flat colors, retro comic book illustration, speech bubbles style, graphic pop art panel, strong graphic design aesthetic",
+    negative: "photograph, photorealistic, 3D CGI, anime, soft colors, watercolor, realistic shading, duplicates",
+    loraScale: 0.75,
+    loraScaleChild: 0.82
+  }
+};
+
 export async function POST(request: Request) {
   try {
-    const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, extraLoraId, extraLoraScale } = await request.json();
+    const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, extraLoraId, extraLoraScale } = await request.json();
 
     if (!trainedModelId) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
@@ -21,8 +60,10 @@ export async function POST(request: Request) {
       : "wearing a classic navy blue crew-neck sweater with round neckline and dark grey trousers";
 
     const finalOutfit = charOutfit ? "wearing " + charOutfit : defaultOutfit;
-
     const characterAnchor = (triggerWord || 'TOK') + ', ' + (charDesc || 'a person') + ', ' + finalOutfit;
+
+    const styleKey = bookStyle || 'digital_painting';
+    const style = STYLE_PROMPTS[styleKey] || STYLE_PROMPTS['digital_painting'];
 
     let cleanedPrompt = prompt || "";
 
@@ -45,32 +86,28 @@ export async function POST(request: Request) {
     }
 
     if (cleanedPrompt.toLowerCase().includes("car")) {
-      cleanedPrompt = cleanedPrompt.replace(/sports car|sportbil|car/gi, "whimsical vintage hand-drawn 2D watercolor car");
+      cleanedPrompt = cleanedPrompt.replace(/sports car|sportbil|car/gi, "vintage hand-drawn car");
     }
     if (cleanedPrompt.toLowerCase().includes("basket")) {
-      cleanedPrompt = cleanedPrompt.replace(/basketball court|basketplan/gi, "charming hand-drawn outdoor court");
-      cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "hand-drawn watercolor basketball");
+      cleanedPrompt = cleanedPrompt.replace(/basketball court|basketplan/gi, "outdoor court");
+      cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "basketball");
     }
 
-    const finalPrompt = "Digital painted illustration, painterly art style, " +
-      "soft brush strokes, natural volumetric lighting, cinematic composition, " +
-      "detailed background environment, illustrated but NOT a photograph. " +
-      "Main subject: " + characterAnchor + ", realistic facial features preserved from reference, " +
-      "painted in warm natural light. Scene: " + cleanedPrompt + ". " +
-      "Style: high quality digital painting, concept art, story illustration. " +
-      "The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change.";
+    const finalPrompt = style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change.";
 
-    console.log("Generating image:", finalPrompt);
+    console.log("Style: " + styleKey + " | Prompt: " + finalPrompt);
+
+    const activeLoraScale = isChild ? style.loraScaleChild : style.loraScale;
 
     const input: any = {
       prompt: finalPrompt,
-      negative_prompt: "photograph, photorealistic, camera shot, DSLR, 3D CGI, Pixar, anime, chibi, duplicate person, clone, blurry, hard black outlines, flat colors, wrong outfit, different clothes",
+      negative_prompt: style.negative + ", wrong outfit, different clothes, clone",
       width: 1024,
       height: 768,
       num_inference_steps: 35,
       guidance_scale: 3.5,
       lora_weights: trainedModelId,
-      lora_scale: isChild ? 0.88 : 0.80
+      lora_scale: activeLoraScale
     };
 
     if (extraLoraId) {
@@ -79,7 +116,6 @@ export async function POST(request: Request) {
     }
 
     const output = await replicate.run("black-forest-labs/flux-dev-lora", { input });
-
     const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
 
     if (!finalImageUrl) {

@@ -127,10 +127,9 @@ export default function Page() {
     onStatusChange('Laddar upp (' + sizeMB + ' MB)...');
     const formData = new FormData();
     formData.append('file', zipBlob, 'training_data.zip');
-    const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: formData });
+    const uploadRes = await fetch('/api/upload-training-data', { method: 'POST', body: formData });
     if (!uploadRes.ok) throw new Error('Upload failed');
-    const uploadData = await uploadRes.json();
-    const rawZipUrl = uploadData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+    const { url: rawZipUrl } = await uploadRes.json();
     onStatusChange('Startar AI-traning... (5-10 min)');
     const trainRes = await fetch('/api/train-model', {
       method: 'POST',

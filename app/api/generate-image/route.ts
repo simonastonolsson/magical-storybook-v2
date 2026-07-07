@@ -46,6 +46,8 @@ export async function POST(request: Request) {
   try {
     const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, extraLoraId, extraLoraScale } = await request.json();
 
+    console.log("generate-image request body:", { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle });
+
     if (!trainedModelId) {
       return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
     }

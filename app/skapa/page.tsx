@@ -1,8 +1,66 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef } from 'react';
 import JSZip from 'jszip';
+import HTMLFlipBook from 'react-pageflip';
 import { signOut } from '@/app/auth/actions';
+
+interface BookPageProps {
+  panel: any;
+  totalPages: number;
+  imageUrl: string | undefined;
+  isGeneratingThisPanel: boolean;
+  isActive: boolean;
+  onNarrationChange: (panelNumber: number, value: string) => void;
+  regenValue: string;
+  onRegenChange: (panelNumber: number, value: string) => void;
+  onRegenSubmit: (panelNumber: number, originalPrompt: string) => void;
+  isRegenLoading: boolean;
+}
+
+const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
+  { panel, totalPages, imageUrl, isGeneratingThisPanel, isActive, onNarrationChange, regenValue, onRegenChange, onRegenSubmit, isRegenLoading },
+  ref
+) {
+  return (
+    <div className="book-page" ref={ref}>
+      <div className="book-page-image-wrap">
+        {imageUrl ? (
+          <img src={imageUrl} alt={'Sida ' + panel.panel_number} className="book-page-img" />
+        ) : (
+          <div className="book-page-placeholder">
+            <span style={{fontSize:'2rem'}}>{isGeneratingThisPanel ? '🎨' : '⏳'}</span>
+            <span style={{fontSize:'0.8rem', color:'#9ca3af'}}>{isGeneratingThisPanel ? 'Ritar...' : 'Vantar...'}</span>
+          </div>
+        )}
+      </div>
+      <textarea
+        className="book-page-text"
+        rows={3}
+        value={panel.narration}
+        onChange={(e) => onNarrationChange(panel.panel_number, e.target.value)}
+      />
+      {isActive && imageUrl && (
+        <div className="book-page-regen">
+          <input
+            type="text"
+            placeholder="Andra nagot i bilden..."
+            value={regenValue}
+            onChange={(e) => onRegenChange(panel.panel_number, e.target.value)}
+            disabled={isRegenLoading}
+          />
+          <button
+            onClick={() => onRegenSubmit(panel.panel_number, panel.image_prompt)}
+            disabled={isRegenLoading || !regenValue?.trim()}
+          >
+            {isRegenLoading ? '...' : 'Uppdatera'}
+          </button>
+        </div>
+      )}
+      <div className="book-page-number">{panel.panel_number} / {totalPages}</div>
+    </div>
+  );
+});
 
 export default function Page() {
   const [step, setStep] = useState(1);
@@ -42,6 +100,7 @@ export default function Page() {
   const [companionTrainingStatus, setCompanionTrainingStatus] = useState('');
   const [companionModelId, setCompanionModelId] = useState<string | null>(null);
   const companionFileInputRef = useRef<HTMLInputElement>(null);
+  const bookRef = useRef<any>(null);
 
   useEffect(() => {
     const cleanName = charName.replace(/[^a-zA-Z]/g, "").toUpperCase();
@@ -373,6 +432,18 @@ export default function Page() {
     </div>
   );
 
+  const handleNarrationChange = (panelNumber: number, value: string) => {
+    setComic((prev: any) => ({ ...prev, panels: prev.panels.map((p: any) => p.panel_number === panelNumber ? { ...p, narration: value } : p) }));
+  };
+
+  const handleRegenChange = (panelNumber: number, value: string) => {
+    setCustomPrompts(prev => ({ ...prev, [panelNumber]: value }));
+  };
+
+  const handleFlip = (e: any) => {
+    setCurrentPage(e.data);
+  };
+
   return (
     <main style={{minHeight:'100vh', background:'#faf8f3', fontFamily:'Inter, sans-serif', color:'#1a1a2e'}}>
       <style>{`
@@ -442,16 +513,30 @@ export default function Page() {
         .comic-header { max-width: 1000px; margin: 0 auto; padding: 5rem 1.5rem 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
         .comic-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; }
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
-        .comic-page-view { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem 8rem; }
-        .comic-page-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-        .comic-page-nav-bottom { margin-top: 1.25rem; margin-bottom: 0; }
-        .comic-page-indicator { font-size: 0.85rem; font-weight: 700; color: #6b7280; white-space: nowrap; }
-        .comic-page-btn { padding: 0.65rem 1.3rem; border-radius: 100px; border: 1.5px solid #e5e0d8; background: white; color: #1a1a2e; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.15s; }
-        .comic-page-btn:hover:not(:disabled) { border-color: #7c3aed; background: #ede9fe; color: #7c3aed; }
-        .comic-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .book-stage { background: #f6f2ea; padding: 2rem 1rem 8rem; display: flex; justify-content: center; }
+        .book-wrapper { position: relative; width: 100%; max-width: 840px; margin: 0 auto; display: flex; justify-content: center; align-items: center; }
+        .story-flipbook { box-shadow: 0 24px 60px rgba(26,26,46,0.28), 0 2px 10px rgba(26,26,46,0.15); border-radius: 6px; }
+        .book-page { background: #fffdf8; height: 100%; display: flex; flex-direction: column; padding: 14px 14px 10px; position: relative; overflow: hidden; }
+        .book-page-image-wrap { flex: 1; min-height: 0; border-radius: 4px; overflow: hidden; background: #f3f0eb; display: flex; }
+        .book-page-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .book-page-placeholder { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
+        .book-page-text { width: 100%; background: transparent; border: none; outline: none; resize: none; font-family: Inter, sans-serif; font-size: 0.85rem; line-height: 1.5; color: #1a1a2e; padding: 0.5rem 0.15rem 0.25rem; flex-shrink: 0; }
+        .book-page-regen { display: flex; gap: 0.4rem; padding-top: 0.4rem; border-top: 1px solid #f0ebe0; flex-shrink: 0; }
+        .book-page-regen input { flex: 1; min-width: 0; padding: 0.4rem 0.6rem; border: 1.5px solid #e5e0d8; border-radius: 8px; font-size: 0.75rem; outline: none; font-family: Inter, sans-serif; }
+        .book-page-regen input:focus { border-color: #7c3aed; }
+        .book-page-regen button { flex-shrink: 0; padding: 0.4rem 0.75rem; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+        .book-page-regen button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .book-page-number { position: absolute; bottom: 6px; right: 10px; font-size: 0.7rem; color: #9ca3af; font-family: Inter, sans-serif; background: rgba(255,255,255,0.75); padding: 1px 7px; border-radius: 100px; }
+        .book-spine { position: absolute; top: 0; bottom: 0; left: 50%; width: 28px; margin-left: -14px; background: linear-gradient(to right, rgba(0,0,0,0.10), rgba(0,0,0,0) 20%, rgba(0,0,0,0) 80%, rgba(0,0,0,0.10)); pointer-events: none; z-index: 5; }
+        .book-nav-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(26,26,46,0.35); color: white; font-size: 1.4rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; opacity: 0; transition: opacity 0.2s, background 0.2s; }
+        .book-wrapper:hover .book-nav-arrow { opacity: 1; }
+        .book-nav-arrow:hover { background: rgba(26,26,46,0.55); }
+        .book-nav-arrow:disabled { opacity: 0.2 !important; cursor: default; pointer-events: none; }
+        .book-nav-arrow-left { left: 10px; }
+        .book-nav-arrow-right { right: 10px; }
         .print-only { display: none; }
         @media print {
-          .wiz-nav, .wiz-progress, .wiz-footer, .comic-header .pdf-btn, .panel-regen, .comic-page-view { display: none !important; }
+          .wiz-nav, .wiz-progress, .wiz-footer, .comic-header .pdf-btn, .panel-regen, .book-stage { display: none !important; }
           .print-only { display: grid !important; }
           .comic-grid { grid-template-columns: 1fr 1fr; gap: 15px; padding: 0; }
           .panel-card { box-shadow: none; border: 3px solid black; break-inside: avoid; }
@@ -460,10 +545,11 @@ export default function Page() {
           .wiz-grid-2 { grid-template-columns: 1fr; }
           .comic-grid { grid-template-columns: 1fr; }
         }
-        @media (max-width: 480px) {
-          .comic-page-view { padding: 1.5rem 1rem 8rem; }
-          .comic-page-btn { padding: 0.6rem 1rem; font-size: 0.85rem; }
-          .comic-page-indicator { font-size: 0.75rem; }
+        @media (max-width: 768px) {
+          .book-wrapper { max-width: 420px; }
+          .book-spine { display: none; }
+          .book-nav-arrow { opacity: 1; width: 38px; height: 38px; font-size: 1.2rem; }
+          .book-stage { padding: 1.25rem 0.5rem 8rem; }
         }
       `}</style>
 
@@ -696,42 +782,71 @@ export default function Page() {
             <h1 className="comic-title">{comic.title}</h1>
           </div>
 
-          <div className="comic-page-view">
-            <div className="comic-page-nav">
+          <div className="book-stage">
+            <div className="book-wrapper">
               <button
-                className="comic-page-btn"
-                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                className="book-nav-arrow book-nav-arrow-left"
+                onClick={() => bookRef.current?.pageFlip().flipPrev()}
                 disabled={currentPage === 0}
+                aria-label="Foregaende sida"
               >
-                ← Foregaende
+                ‹
               </button>
-              <span className="comic-page-indicator">Sida {currentPage + 1} av {comic.panels.length}</span>
-              <button
-                className="comic-page-btn"
-                onClick={() => setCurrentPage((p) => Math.min(comic.panels.length - 1, p + 1))}
-                disabled={currentPage === comic.panels.length - 1}
-              >
-                Nasta →
-              </button>
-            </div>
 
-            {renderPanelCard(comic.panels[currentPage])}
+              <div className="book-spine" />
 
-            <div className="comic-page-nav comic-page-nav-bottom">
-              <button
-                className="comic-page-btn"
-                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                disabled={currentPage === 0}
+              <HTMLFlipBook
+                key={comic.title}
+                width={420}
+                height={630}
+                size="stretch"
+                minWidth={280}
+                maxWidth={420}
+                minHeight={420}
+                maxHeight={630}
+                maxShadowOpacity={0.5}
+                showCover={false}
+                mobileScrollSupport={true}
+                onFlip={handleFlip}
+                className="story-flipbook"
+                style={{}}
+                startPage={0}
+                drawShadow={true}
+                flippingTime={700}
+                usePortrait={true}
+                startZIndex={0}
+                autoSize={true}
+                clickEventForward={true}
+                useMouseEvents={true}
+                swipeDistance={30}
+                showPageCorners={true}
+                disableFlipByClick={false}
+                ref={bookRef}
               >
-                ← Foregaende
-              </button>
-              <span className="comic-page-indicator">Sida {currentPage + 1} av {comic.panels.length}</span>
+                {comic.panels.map((panel: any, index: number) => (
+                  <BookPage
+                    key={panel.panel_number}
+                    panel={panel}
+                    totalPages={comic.panels.length}
+                    imageUrl={generatedImages[panel.panel_number]}
+                    isGeneratingThisPanel={currentlyGeneratingPanel === panel.panel_number}
+                    isActive={index === currentPage}
+                    onNarrationChange={handleNarrationChange}
+                    regenValue={customPrompts[panel.panel_number] || ''}
+                    onRegenChange={handleRegenChange}
+                    onRegenSubmit={handleRegeneratePanel}
+                    isRegenLoading={!!panelsLoading[panel.panel_number]}
+                  />
+                ))}
+              </HTMLFlipBook>
+
               <button
-                className="comic-page-btn"
-                onClick={() => setCurrentPage((p) => Math.min(comic.panels.length - 1, p + 1))}
+                className="book-nav-arrow book-nav-arrow-right"
+                onClick={() => bookRef.current?.pageFlip().flipNext()}
                 disabled={currentPage === comic.panels.length - 1}
+                aria-label="Nasta sida"
               >
-                Nasta →
+                ›
               </button>
             </div>
           </div>

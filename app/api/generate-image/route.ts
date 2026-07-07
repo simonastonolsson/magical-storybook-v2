@@ -67,6 +67,8 @@ export async function POST(request: Request) {
     const styleKey = bookStyle || 'digital_painting';
     const style = STYLE_PROMPTS[styleKey] || STYLE_PROMPTS['digital_painting'];
 
+    console.log("generate-image style resolution:", { receivedBookStyle: bookStyle, resolvedStyleKey: styleKey });
+
     let cleanedPrompt = prompt || "";
 
     const stylePrefix = "Comic book panel illustration, graphic novel art,";
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "basketball");
     }
 
-    const finalPrompt = style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters";
+    const finalPrompt = "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters";
 
     console.log("Style: " + styleKey + " | Prompt: " + finalPrompt);
 

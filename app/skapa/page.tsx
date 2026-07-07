@@ -69,17 +69,25 @@ const BookBlankPage = forwardRef<HTMLDivElement, {}>(function BookBlankPage(_pro
 interface BookCoverProps {
   variant: 'front' | 'back';
   title: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  isGenerating?: boolean;
 }
 
 const BookCoverPage = forwardRef<HTMLDivElement, BookCoverProps>(function BookCoverPage(
-  { variant, title, imageUrl },
+  { variant, title, imageUrl, isGenerating },
   ref
 ) {
   if (variant === 'front') {
     return (
       <div className="book-page book-cover book-cover-front" ref={ref}>
-        {imageUrl && <img src={imageUrl} alt="" className="book-cover-img" />}
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="book-cover-img" />
+        ) : isGenerating ? (
+          <div className="book-cover-placeholder">
+            <span style={{fontSize:'2rem'}}>🎨</span>
+            <span style={{fontSize:'0.8rem', color:'rgba(255,255,255,0.65)'}}>Skapar omslag...</span>
+          </div>
+        ) : null}
         <div className="book-cover-overlay">
           <span className="book-cover-eyebrow">Storylabz</span>
           <h2 className="book-cover-title">{title}</h2>
@@ -93,6 +101,31 @@ const BookCoverPage = forwardRef<HTMLDivElement, BookCoverProps>(function BookCo
     </div>
   );
 });
+
+const BOOK_ASPECT = 1.5; // height / width, matches a 2:3 portrait page
+const MOBILE_BREAKPOINT = 768;
+
+function computeBookSize() {
+  if (typeof window === 'undefined') {
+    return { width: 420, height: 630, mobile: false };
+  }
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const mobile = vw < MOBILE_BREAKPOINT;
+
+  let height = vh * 0.85;
+  let width = height / BOOK_ASPECT;
+
+  // Reserve room for the overlay nav arrows so the spread never gets clipped.
+  const maxContentWidth = mobile ? vw - 64 : vw - 320;
+  const pagesWide = mobile ? 1 : 2;
+  if (width * pagesWide > maxContentWidth) {
+    width = maxContentWidth / pagesWide;
+    height = width * BOOK_ASPECT;
+  }
+
+  return { width: Math.round(width), height: Math.round(height), mobile };
+}
 
 export default function Page() {
   const [step, setStep] = useState(1);
@@ -123,6 +156,8 @@ export default function Page() {
   const [currentlyGeneratingPanel, setCurrentlyGeneratingPanel] = useState<number | null>(null);
   const [customPrompts, setCustomPrompts] = useState<Record<number, string>>({});
   const [panelsLoading, setPanelsLoading] = useState<Record<number, boolean>>({});
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [isGeneratingCover, setIsGeneratingCover] = useState(false);
 
   const [companionType, setCompanionType] = useState<'none' | 'dog' | 'cat' | 'friend'>('none');
   const [companionName, setCompanionName] = useState('');
@@ -134,36 +169,13 @@ export default function Page() {
   const companionFileInputRef = useRef<HTMLInputElement>(null);
   const bookRef = useRef<any>(null);
 
-  const [bookSize, setBookSize] = useState({ width: 420, height: 630 });
-  const [isMobileBook, setIsMobileBook] = useState(false);
+  const [bookSize, setBookSize] = useState(() => computeBookSize());
 
   useEffect(() => {
-    const BOOK_ASPECT = 1.5; // height / width, matches a 2:3 portrait page
-    const MOBILE_BREAKPOINT = 768;
-
-    const computeBookSize = () => {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const mobile = vw < MOBILE_BREAKPOINT;
-      setIsMobileBook(mobile);
-
-      let height = vh * 0.83;
-      let width = height / BOOK_ASPECT;
-
-      // Reserve room for the overlay nav arrows so the spread never gets clipped.
-      const maxContentWidth = mobile ? vw - 64 : vw - 320;
-      const pagesWide = mobile ? 1 : 2;
-      if (width * pagesWide > maxContentWidth) {
-        width = maxContentWidth / pagesWide;
-        height = width * BOOK_ASPECT;
-      }
-
-      setBookSize({ width: Math.round(width), height: Math.round(height) });
-    };
-
-    computeBookSize();
-    window.addEventListener('resize', computeBookSize);
-    return () => window.removeEventListener('resize', computeBookSize);
+    const handleResize = () => setBookSize(computeBookSize());
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -362,12 +374,45 @@ export default function Page() {
     setIsGeneratingImages(false);
   };
 
+  const generateCoverImage = async (comicData: any) => {
+    setIsGeneratingCover(true);
+    try {
+      const heroPanel = comicData.panels[0];
+      const coverPrompt = "Comic book cover art, " + charTrigger + " in a dramatic heroic pose capturing the essence of the story '" + comicData.title + "', eye-catching composition, dynamic lighting, title-ready framing with clear space at top for text, " + (heroPanel?.image_prompt || '') + ", bold attention-grabbing cover illustration";
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: coverPrompt,
+          trainedModelId,
+          triggerWord: charTrigger,
+          charDesc,
+          charName,
+          charOutfit: customOutfit || charOutfit,
+          bookStyle,
+          referenceImageUrl,
+          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+          extraLoraScale: 0.8
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCoverImageUrl(data.imageUrl);
+      }
+    } catch (err) {
+      console.error('Failed to generate cover image', err);
+    } finally {
+      setIsGeneratingCover(false);
+    }
+  };
+
   const handleCreateStory = async () => {
     if (!memory.trim()) { alert("Beskriv ett aventyr forst!"); return; }
     setIsLoadingScript(true);
     setComic(null);
     setCurrentPage(0);
     setGeneratedImages({});
+    setCoverImageUrl(null);
     let secondaryDescription = "";
     const companionTriggerWord = companionName.replace(/[^a-zA-Z]/g, "").toUpperCase() + 'TOK';
     if (companionType === 'dog') secondaryDescription = 'a friendly golden retriever dog named ' + (companionName || "Aston");
@@ -397,6 +442,7 @@ export default function Page() {
       if (!response.ok) throw new Error('Server error');
       const data = await response.json();
       setComic(data.comic);
+      await generateCoverImage(data.comic);
       generateImagesForComic(data.comic);
     } catch (err) {
       console.error(err);
@@ -574,7 +620,7 @@ export default function Page() {
         .panel-regen input:focus { border-color: #7c3aed; }
         .panel-regen button { padding: 0.5rem 1rem; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
         .panel-regen button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .comic-header { max-width: 1000px; margin: 0 auto; padding: 5rem 1.5rem 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
+        .comic-header { max-width: 1000px; margin: 0 auto; padding: 5rem 1.5rem 0; display: none; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
         .comic-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; }
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .book-stage { background: #f6f2ea; min-height: 88vh; padding: 2rem clamp(24px, 8vw, 140px); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
@@ -595,23 +641,24 @@ export default function Page() {
         .book-blank-page { background: #fffdf8; }
         .book-cover { align-items: center; justify-content: center; }
         .book-cover-front { padding: 0; position: relative; background: #1a1a2e; }
-        .book-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.55; }
-        .book-cover-overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0.75rem; height: 100%; padding: 2rem; background: linear-gradient(to top, rgba(26,26,46,0.75), rgba(26,26,46,0.25)); }
+        .book-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .book-cover-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
+        .book-cover-overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; gap: 0.5rem; height: 100%; padding: 1.75rem 1.5rem; background: linear-gradient(to top, rgba(26,26,46,0.92) 0%, rgba(26,26,46,0.55) 40%, rgba(26,26,46,0) 78%); }
         .book-cover-eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #e8b84b; }
         .book-cover-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; color: white; line-height: 1.2; }
         .book-cover-back { background: #1a1a2e; }
         .book-cover-back-label { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: rgba(255,255,255,0.6); letter-spacing: 0.08em; }
         .book-spine { position: absolute; top: 3%; bottom: 3%; left: 50%; width: 60px; margin-left: -30px; background: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 30%, rgba(0,0,0,0.24) 50%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0) 100%); pointer-events: none; z-index: 6; }
-        .book-nav-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 56px; height: 56px; border-radius: 50%; border: none; background: rgba(26,26,46,0.4); color: white; font-size: 1.6rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 9999; opacity: 0; transition: opacity 0.2s, background 0.2s; }
-        .book-wrapper:hover .book-nav-arrow { opacity: 1; }
-        .book-nav-arrow:hover { background: rgba(26,26,46,0.6); }
-        .book-nav-arrow:disabled { opacity: 0.15 !important; cursor: default; pointer-events: none; }
+        .book-nav-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 56px; height: 56px; border-radius: 50%; border: none; background: rgba(26,26,46,0.45); color: white; font-size: 1.6rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 9999; opacity: 1; transition: background 0.2s, transform 0.2s; }
+        .book-nav-arrow:hover { background: rgba(26,26,46,0.65); transform: translateY(-50%) scale(1.06); }
+        .book-nav-arrow:disabled { opacity: 0.15; cursor: default; pointer-events: none; }
         .book-nav-arrow-left { left: -76px; }
         .book-nav-arrow-right { right: -76px; }
         .print-only { display: none; }
         @media print {
           .wiz-nav, .wiz-progress, .wiz-footer, .comic-header .pdf-btn, .panel-regen, .book-stage { display: none !important; }
           .print-only { display: grid !important; }
+          .comic-header { display: flex !important; }
           .comic-grid { grid-template-columns: 1fr 1fr; gap: 15px; padding: 0; }
           .panel-card { box-shadow: none; border: 3px solid black; break-inside: avoid; }
         }
@@ -621,7 +668,7 @@ export default function Page() {
         }
         @media (max-width: 768px) {
           .book-spine { display: none; }
-          .book-nav-arrow { opacity: 1; width: 42px; height: 42px; font-size: 1.3rem; background: rgba(26,26,46,0.5); }
+          .book-nav-arrow { width: 42px; height: 42px; font-size: 1.3rem; background: rgba(26,26,46,0.5); }
           .book-nav-arrow-left { left: 8px; }
           .book-nav-arrow-right { right: 8px; }
           .book-stage { padding: 1.25rem 0.5rem; min-height: 80vh; }
@@ -858,15 +905,19 @@ export default function Page() {
           </div>
 
           <div className="book-stage">
-            <div className="book-wrapper">
-              <button
-                className="book-nav-arrow book-nav-arrow-left"
-                onClick={() => bookRef.current?.pageFlip().flipPrev()}
-                disabled={currentPage === 0}
-                aria-label="Foregaende sida"
-              >
-                ‹
-              </button>
+            <div
+              className="book-wrapper"
+              style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
+            >
+              {currentPage > 0 && (
+                <button
+                  className="book-nav-arrow book-nav-arrow-left"
+                  onClick={() => bookRef.current?.pageFlip().flipPrev()}
+                  aria-label="Foregaende sida"
+                >
+                  ‹
+                </button>
+              )}
 
               <div className="book-shadow-wrapper">
                 <div className="book-spine" />
@@ -889,9 +940,9 @@ export default function Page() {
                   startPage={0}
                   drawShadow={true}
                   flippingTime={700}
-                  usePortrait={isMobileBook}
+                  usePortrait={bookSize.mobile}
                   startZIndex={0}
-                  autoSize={true}
+                  autoSize={false}
                   clickEventForward={true}
                   useMouseEvents={true}
                   swipeDistance={30}
@@ -900,7 +951,7 @@ export default function Page() {
                   ref={bookRef}
                 >
                   <BookBlankPage key="blank-front" />
-                  <BookCoverPage key="cover-front" variant="front" title={comic.title} imageUrl={generatedImages[comic.panels[0]?.panel_number]} />
+                  <BookCoverPage key="cover-front" variant="front" title={comic.title} imageUrl={coverImageUrl} isGenerating={isGeneratingCover} />
                   {comic.panels.map((panel: any, index: number) => (
                     <BookPage
                       key={panel.panel_number}

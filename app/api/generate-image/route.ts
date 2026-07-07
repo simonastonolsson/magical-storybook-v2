@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "basketball");
     }
 
-    const finalPrompt = style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change.";
+    const finalPrompt = style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, full head and hair fully visible in frame, ample headroom above the head, character not cropped at top";
 
     console.log("Style: " + styleKey + " | Prompt: " + finalPrompt);
 
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       prompt: finalPrompt,
       negative_prompt: style.negative + ", wrong outfit, different clothes, clone",
       width: 1024,
-      height: 768,
+      height: 1024,
       num_inference_steps: 35,
       guidance_scale: 3.5,
       lora_scale: activeLoraScale

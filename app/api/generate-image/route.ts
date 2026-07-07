@@ -23,7 +23,7 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; loraSc
     loraScaleChild: 0.85
   },
   watercolor: {
-    positive: "cozy heartwarming 2D hand-drawn watercolor children storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
+    positive: "cozy heartwarming 2D hand-drawn watercolor storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
     negative: "photograph, photorealistic, 3D CGI, Pixar, anime, chibi, hard outlines, flat digital colors, duplicates",
     loraScale: 0.85,
     loraScaleChild: 0.90

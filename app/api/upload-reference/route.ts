@@ -1,8 +1,19 @@
-import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+
+const BUCKET = 'reference-images';
 
 export async function POST(request: Request) {
   try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -10,12 +21,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const blob = await put('reference-' + Date.now() + '.jpg', file, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN
-    });
+    const path = `${user.id}/reference-${Date.now()}.jpg`;
 
-    return NextResponse.json({ url: blob.url });
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { contentType: 'image/jpeg', upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+    return NextResponse.json({ url: publicUrl });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json({ error: 'Failed to upload reference image' }, { status: 500 });

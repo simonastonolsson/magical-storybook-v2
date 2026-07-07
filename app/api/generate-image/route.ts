@@ -106,7 +106,6 @@ export async function POST(request: Request) {
       height: 768,
       num_inference_steps: 35,
       guidance_scale: 3.5,
-      lora_weights: trainedModelId,
       lora_scale: activeLoraScale
     };
 
@@ -115,7 +114,7 @@ export async function POST(request: Request) {
       input.extra_lora_scale = extraLoraScale || 0.8;
     }
 
-    const output = await replicate.run("black-forest-labs/flux-dev-lora", { input });
+    const output = await replicate.run(trainedModelId, { input });
     const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
 
     if (!finalImageUrl) {

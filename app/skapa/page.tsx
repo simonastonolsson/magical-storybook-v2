@@ -8,6 +8,7 @@ export default function Page() {
   const [step, setStep] = useState(1);
   const [memory, setMemory] = useState('');
   const [comic, setComic] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
   const [pageCount, setPageCount] = useState<number>(8);
 
@@ -242,6 +243,7 @@ export default function Page() {
     if (!memory.trim()) { alert("Beskriv ett aventyr forst!"); return; }
     setIsLoadingScript(true);
     setComic(null);
+    setCurrentPage(0);
     setGeneratedImages({});
     let secondaryDescription = "";
     const companionTriggerWord = companionName.replace(/[^a-zA-Z]/g, "").toUpperCase() + 'TOK';
@@ -341,6 +343,36 @@ export default function Page() {
 
   const outfits = isChild ? childOutfits : adultOutfits;
 
+  const renderPanelCard = (panel: any) => (
+    <div key={panel.panel_number} className="panel-card">
+      <div style={{position:'relative'}}>
+        {generatedImages[panel.panel_number] ? (
+          <img src={generatedImages[panel.panel_number]} alt={'Panel ' + panel.panel_number} className="panel-img" />
+        ) : (
+          <div className="panel-placeholder">
+            <span style={{fontSize:'2rem'}}>{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
+            <span style={{fontSize:'0.8rem', color:'#9ca3af'}}>{currentlyGeneratingPanel === panel.panel_number ? 'Ritar...' : 'Vantar...'}</span>
+          </div>
+        )}
+        <div className="panel-num">{panel.panel_number}</div>
+      </div>
+      <div className="panel-body">
+        <textarea className="panel-text" rows={3} value={panel.narration} onChange={(e) => {
+          const val = e.target.value;
+          setComic((prev: any) => ({ ...prev, panels: prev.panels.map((p: any) => p.panel_number === panel.panel_number ? { ...p, narration: val } : p) }));
+        }} />
+        {generatedImages[panel.panel_number] && (
+          <div className="panel-regen">
+            <input type="text" placeholder="Andra nagot i bilden..." value={customPrompts[panel.panel_number] || ''} onChange={(e) => setCustomPrompts(prev => ({ ...prev, [panel.panel_number]: e.target.value }))} disabled={panelsLoading[panel.panel_number]} />
+            <button onClick={() => handleRegeneratePanel(panel.panel_number, panel.image_prompt)} disabled={panelsLoading[panel.panel_number] || !customPrompts[panel.panel_number]?.trim()}>
+              {panelsLoading[panel.panel_number] ? '...' : 'Uppdatera'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <main style={{minHeight:'100vh', background:'#faf8f3', fontFamily:'Inter, sans-serif', color:'#1a1a2e'}}>
       <style>{`
@@ -410,14 +442,28 @@ export default function Page() {
         .comic-header { max-width: 1000px; margin: 0 auto; padding: 5rem 1.5rem 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
         .comic-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; }
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+        .comic-page-view { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem 8rem; }
+        .comic-page-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+        .comic-page-nav-bottom { margin-top: 1.25rem; margin-bottom: 0; }
+        .comic-page-indicator { font-size: 0.85rem; font-weight: 700; color: #6b7280; white-space: nowrap; }
+        .comic-page-btn { padding: 0.65rem 1.3rem; border-radius: 100px; border: 1.5px solid #e5e0d8; background: white; color: #1a1a2e; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.15s; }
+        .comic-page-btn:hover:not(:disabled) { border-color: #7c3aed; background: #ede9fe; color: #7c3aed; }
+        .comic-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .print-only { display: none; }
         @media print {
-          .wiz-nav, .wiz-progress, .wiz-footer, .comic-header .pdf-btn, .panel-regen { display: none !important; }
+          .wiz-nav, .wiz-progress, .wiz-footer, .comic-header .pdf-btn, .panel-regen, .comic-page-view { display: none !important; }
+          .print-only { display: grid !important; }
           .comic-grid { grid-template-columns: 1fr 1fr; gap: 15px; padding: 0; }
           .panel-card { box-shadow: none; border: 3px solid black; break-inside: avoid; }
         }
         @media (max-width: 600px) {
           .wiz-grid-2 { grid-template-columns: 1fr; }
           .comic-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+          .comic-page-view { padding: 1.5rem 1rem 8rem; }
+          .comic-page-btn { padding: 0.6rem 1rem; font-size: 0.85rem; }
+          .comic-page-indicator { font-size: 0.75rem; }
         }
       `}</style>
 
@@ -649,36 +695,50 @@ export default function Page() {
           <div className="comic-header">
             <h1 className="comic-title">{comic.title}</h1>
           </div>
-          <div className="comic-grid">
-            {comic.panels.map((panel: any) => (
-              <div key={panel.panel_number} className="panel-card">
-                <div style={{position:'relative'}}>
-                  {generatedImages[panel.panel_number] ? (
-                    <img src={generatedImages[panel.panel_number]} alt={'Panel ' + panel.panel_number} className="panel-img" />
-                  ) : (
-                    <div className="panel-placeholder">
-                      <span style={{fontSize:'2rem'}}>{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
-                      <span style={{fontSize:'0.8rem', color:'#9ca3af'}}>{currentlyGeneratingPanel === panel.panel_number ? 'Ritar...' : 'Vantar...'}</span>
-                    </div>
-                  )}
-                  <div className="panel-num">{panel.panel_number}</div>
-                </div>
-                <div className="panel-body">
-                  <textarea className="panel-text" rows={3} value={panel.narration} onChange={(e) => {
-                    const val = e.target.value;
-                    setComic((prev: any) => ({ ...prev, panels: prev.panels.map((p: any) => p.panel_number === panel.panel_number ? { ...p, narration: val } : p) }));
-                  }} />
-                  {generatedImages[panel.panel_number] && (
-                    <div className="panel-regen">
-                      <input type="text" placeholder="Andra nagot i bilden..." value={customPrompts[panel.panel_number] || ''} onChange={(e) => setCustomPrompts(prev => ({ ...prev, [panel.panel_number]: e.target.value }))} disabled={panelsLoading[panel.panel_number]} />
-                      <button onClick={() => handleRegeneratePanel(panel.panel_number, panel.image_prompt)} disabled={panelsLoading[panel.panel_number] || !customPrompts[panel.panel_number]?.trim()}>
-                        {panelsLoading[panel.panel_number] ? '...' : 'Uppdatera'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+
+          <div className="comic-page-view">
+            <div className="comic-page-nav">
+              <button
+                className="comic-page-btn"
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+              >
+                ← Foregaende
+              </button>
+              <span className="comic-page-indicator">Sida {currentPage + 1} av {comic.panels.length}</span>
+              <button
+                className="comic-page-btn"
+                onClick={() => setCurrentPage((p) => Math.min(comic.panels.length - 1, p + 1))}
+                disabled={currentPage === comic.panels.length - 1}
+              >
+                Nasta →
+              </button>
+            </div>
+
+            {renderPanelCard(comic.panels[currentPage])}
+
+            <div className="comic-page-nav comic-page-nav-bottom">
+              <button
+                className="comic-page-btn"
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+              >
+                ← Foregaende
+              </button>
+              <span className="comic-page-indicator">Sida {currentPage + 1} av {comic.panels.length}</span>
+              <button
+                className="comic-page-btn"
+                onClick={() => setCurrentPage((p) => Math.min(comic.panels.length - 1, p + 1))}
+                disabled={currentPage === comic.panels.length - 1}
+              >
+                Nasta →
+              </button>
+            </div>
+          </div>
+
+          {/* Full book, only rendered for PDF/print export */}
+          <div className="comic-grid print-only">
+            {comic.panels.map((panel: any) => renderPanelCard(panel))}
           </div>
         </>
       )}

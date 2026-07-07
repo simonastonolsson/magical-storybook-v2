@@ -222,6 +222,7 @@ export default function Page() {
             charDesc,
             charName,
             charOutfit: customOutfit || charOutfit,
+            bookStyle,
             referenceImageUrl,
             extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
             extraLoraScale: 0.8

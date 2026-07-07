@@ -62,10 +62,6 @@ const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
   );
 });
 
-const BookBlankPage = forwardRef<HTMLDivElement, {}>(function BookBlankPage(_props, ref) {
-  return <div className="book-page book-blank-page" ref={ref} />;
-});
-
 interface BookCoverProps {
   variant: 'front' | 'back';
   title: string;
@@ -73,13 +69,13 @@ interface BookCoverProps {
   isGenerating?: boolean;
 }
 
-const BookCoverPage = forwardRef<HTMLDivElement, BookCoverProps>(function BookCoverPage(
-  { variant, title, imageUrl, isGenerating },
-  ref
-) {
+// Rendered standalone (outside HTMLFlipBook) so the cover/back cover can take
+// up the full spread width as one page, instead of react-pageflip's hard-page
+// mode, which still reserves a 2-page-wide slot and leaves the other half empty.
+function BookCoverPage({ variant, title, imageUrl, isGenerating }: BookCoverProps) {
   if (variant === 'front') {
     return (
-      <div className="book-page book-cover book-cover-front" ref={ref}>
+      <div className="book-page book-cover book-cover-front">
         {imageUrl ? (
           <img src={imageUrl} alt="" className="book-cover-img" />
         ) : isGenerating ? (
@@ -96,11 +92,11 @@ const BookCoverPage = forwardRef<HTMLDivElement, BookCoverProps>(function BookCo
     );
   }
   return (
-    <div className="book-page book-cover book-cover-back" ref={ref}>
+    <div className="book-page book-cover book-cover-back">
       <span className="book-cover-back-label">Slut</span>
     </div>
   );
-});
+}
 
 const BOOK_ASPECT = 1.5; // height / width, matches a 2:3 portrait page
 const MOBILE_BREAKPOINT = 768;
@@ -168,6 +164,9 @@ export default function Page() {
   const [companionModelId, setCompanionModelId] = useState<string | null>(null);
   const companionFileInputRef = useRef<HTMLInputElement>(null);
   const bookRef = useRef<any>(null);
+
+  const [bookView, setBookView] = useState<'cover' | 'reading' | 'back-cover'>('cover');
+  const [flipbookStartPage, setFlipbookStartPage] = useState(0);
 
   const [bookSize, setBookSize] = useState(() => computeBookSize());
 
@@ -411,6 +410,8 @@ export default function Page() {
     setIsLoadingScript(true);
     setComic(null);
     setCurrentPage(0);
+    setBookView('cover');
+    setFlipbookStartPage(0);
     setGeneratedImages({});
     setCoverImageUrl(null);
     let secondaryDescription = "";
@@ -554,6 +555,40 @@ export default function Page() {
     setCurrentPage(e.data);
   };
 
+  const handleBookNext = () => {
+    if (bookView === 'cover') {
+      setFlipbookStartPage(0);
+      setBookView('reading');
+      return;
+    }
+    if (bookView === 'reading' && comic) {
+      const isOnLastSpread = currentPage >= comic.panels.length - 2;
+      if (isOnLastSpread) {
+        setBookView('back-cover');
+      } else {
+        bookRef.current?.pageFlip().flipNext();
+      }
+    }
+  };
+
+  const handleBookPrev = () => {
+    if (bookView === 'back-cover' && comic) {
+      const lastSpreadStart = comic.panels.length % 2 === 0
+        ? Math.max(0, comic.panels.length - 2)
+        : Math.max(0, comic.panels.length - 1);
+      setFlipbookStartPage(lastSpreadStart);
+      setBookView('reading');
+      return;
+    }
+    if (bookView === 'reading') {
+      if (currentPage === 0) {
+        setBookView('cover');
+      } else {
+        bookRef.current?.pageFlip().flipPrev();
+      }
+    }
+  };
+
   return (
     <main style={{minHeight:'100vh', background:'#faf8f3', fontFamily:'Inter, sans-serif', color:'#1a1a2e'}}>
       <style>{`
@@ -625,8 +660,13 @@ export default function Page() {
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .book-stage { background: #f6f2ea; min-height: 88vh; padding: 2rem clamp(24px, 8vw, 140px); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
         .book-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-        .book-shadow-wrapper { position: relative; box-shadow: 0 30px 70px rgba(26,26,46,0.35), 0 10px 26px rgba(26,26,46,0.22), 0 2px 8px rgba(26,26,46,0.18); border-radius: 6px; }
+        .book-shadow-wrapper { position: relative; box-shadow: 0 30px 70px rgba(26,26,46,0.35), 0 10px 26px rgba(26,26,46,0.22), 0 2px 8px rgba(26,26,46,0.18); border-radius: 6px; animation: bookRevealIn 0.45s ease; }
+        .book-shadow-wrapper-single { overflow: hidden; }
         .story-flipbook { border-radius: 6px; }
+        @keyframes bookRevealIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+        @media (prefers-reduced-motion: reduce) {
+          .book-shadow-wrapper { animation: none; }
+        }
         .book-page { background: #fffdf8; height: 100%; display: flex; flex-direction: column; padding: 14px 14px 10px; position: relative; overflow: hidden; }
         .book-page-image-wrap { flex: 1; min-height: 0; border-radius: 4px; overflow: hidden; background: #f3f0eb; display: flex; }
         .book-page-img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -638,7 +678,6 @@ export default function Page() {
         .book-page-regen button { flex-shrink: 0; padding: 0.4rem 0.75rem; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
         .book-page-regen button:disabled { opacity: 0.5; cursor: not-allowed; }
         .book-page-number { position: absolute; bottom: 6px; right: 10px; font-size: 0.7rem; color: #9ca3af; font-family: Inter, sans-serif; background: rgba(255,255,255,0.75); padding: 1px 7px; border-radius: 100px; }
-        .book-blank-page { background: #fffdf8; }
         .book-cover { align-items: center; justify-content: center; }
         .book-cover-front { padding: 0; position: relative; background: #1a1a2e; }
         .book-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -909,77 +948,94 @@ export default function Page() {
               className="book-wrapper"
               style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
             >
-              {currentPage > 0 && (
+              {!(bookView === 'cover') && (
                 <button
                   className="book-nav-arrow book-nav-arrow-left"
-                  onClick={() => bookRef.current?.pageFlip().flipPrev()}
+                  onClick={handleBookPrev}
                   aria-label="Foregaende sida"
                 >
                   ‹
                 </button>
               )}
 
-              <div className="book-shadow-wrapper">
-                <div className="book-spine" />
-
-                <HTMLFlipBook
-                  key={comic.title + '-' + bookSize.width}
-                  width={bookSize.width}
-                  height={bookSize.height}
-                  size="fixed"
-                  minWidth={bookSize.width}
-                  maxWidth={bookSize.width}
-                  minHeight={bookSize.height}
-                  maxHeight={bookSize.height}
-                  maxShadowOpacity={0.6}
-                  showCover={false}
-                  mobileScrollSupport={true}
-                  onFlip={handleFlip}
-                  className="story-flipbook"
-                  style={{}}
-                  startPage={0}
-                  drawShadow={true}
-                  flippingTime={700}
-                  usePortrait={bookSize.mobile}
-                  startZIndex={0}
-                  autoSize={false}
-                  clickEventForward={true}
-                  useMouseEvents={true}
-                  swipeDistance={30}
-                  showPageCorners={true}
-                  disableFlipByClick={false}
-                  ref={bookRef}
+              {bookView === 'cover' && (
+                <div
+                  className="book-shadow-wrapper book-shadow-wrapper-single"
+                  style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
                 >
-                  <BookBlankPage key="blank-front" />
-                  <BookCoverPage key="cover-front" variant="front" title={comic.title} imageUrl={coverImageUrl} isGenerating={isGeneratingCover} />
-                  {comic.panels.map((panel: any, index: number) => (
-                    <BookPage
-                      key={panel.panel_number}
-                      panel={panel}
-                      totalPages={comic.panels.length}
-                      imageUrl={generatedImages[panel.panel_number]}
-                      isGeneratingThisPanel={currentlyGeneratingPanel === panel.panel_number}
-                      isActive={index + 2 === currentPage}
-                      onNarrationChange={handleNarrationChange}
-                      regenValue={customPrompts[panel.panel_number] || ''}
-                      onRegenChange={handleRegenChange}
-                      onRegenSubmit={handleRegeneratePanel}
-                      isRegenLoading={!!panelsLoading[panel.panel_number]}
-                    />
-                  ))}
-                  <BookBlankPage key="blank-back" />
-                  <BookCoverPage key="cover-back" variant="back" title={comic.title} />
-                </HTMLFlipBook>
-              </div>
+                  <BookCoverPage variant="front" title={comic.title} imageUrl={coverImageUrl} isGenerating={isGeneratingCover} />
+                </div>
+              )}
 
-              <button
-                className="book-nav-arrow book-nav-arrow-right"
-                onClick={() => bookRef.current?.pageFlip().flipNext()}
-                disabled={currentPage === comic.panels.length + 3}
-                aria-label="Nasta sida"
-              >
-                ›
-              </button>
+              {bookView === 'reading' && (
+                <div className="book-shadow-wrapper">
+                  <div className="book-spine" />
+
+                  <HTMLFlipBook
+                    key={comic.title + '-' + bookSize.width + '-' + flipbookStartPage}
+                    width={bookSize.width}
+                    height={bookSize.height}
+                    size="fixed"
+                    minWidth={bookSize.width}
+                    maxWidth={bookSize.width}
+                    minHeight={bookSize.height}
+                    maxHeight={bookSize.height}
+                    maxShadowOpacity={0.6}
+                    showCover={false}
+                    mobileScrollSupport={true}
+                    onFlip={handleFlip}
+                    className="story-flipbook"
+                    style={{}}
+                    startPage={flipbookStartPage}
+                    drawShadow={true}
+                    flippingTime={700}
+                    usePortrait={bookSize.mobile}
+                    startZIndex={0}
+                    autoSize={false}
+                    clickEventForward={true}
+                    useMouseEvents={true}
+                    swipeDistance={30}
+                    showPageCorners={true}
+                    disableFlipByClick={false}
+                    ref={bookRef}
+                  >
+                    {comic.panels.map((panel: any, index: number) => (
+                      <BookPage
+                        key={panel.panel_number}
+                        panel={panel}
+                        totalPages={comic.panels.length}
+                        imageUrl={generatedImages[panel.panel_number]}
+                        isGeneratingThisPanel={currentlyGeneratingPanel === panel.panel_number}
+                        isActive={index === currentPage}
+                        onNarrationChange={handleNarrationChange}
+                        regenValue={customPrompts[panel.panel_number] || ''}
+                        onRegenChange={handleRegenChange}
+                        onRegenSubmit={handleRegeneratePanel}
+                        isRegenLoading={!!panelsLoading[panel.panel_number]}
+                      />
+                    ))}
+                  </HTMLFlipBook>
+                </div>
+              )}
+
+              {bookView === 'back-cover' && (
+                <div
+                  className="book-shadow-wrapper book-shadow-wrapper-single"
+                  style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
+                >
+                  <BookCoverPage variant="back" title={comic.title} />
+                </div>
+              )}
+
+              {!(bookView === 'back-cover') && (
+                <button
+                  className="book-nav-arrow book-nav-arrow-right"
+                  onClick={handleBookNext}
+                  aria-label="Nasta sida"
+                >
+                  ›
+                </button>
+              )}
             </div>
           </div>
 

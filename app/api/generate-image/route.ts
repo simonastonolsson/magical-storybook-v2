@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN } as any);
 
-const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualityBoost: string; qualityBoostNoLighting: string; styleConsistency: string; loraScale: number; loraScaleChild: number }> = {
+const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualityBoost: string; qualityBoostNoLighting: string; styleConsistency: string; loraScale: number; loraScaleChild: number; loraScaleSolo: number; loraScaleSoloChild: number }> = {
   digital_painting: {
     positive: "digital painted illustration, painterly art style, soft brush strokes, natural volumetric lighting, cinematic composition, detailed background environment, high quality digital painting, concept art, story illustration",
     negative: "photograph, photorealistic, DSLR, 3D CGI, Pixar, anime, chibi, flat colors, hard outlines, duplicates",
@@ -11,7 +11,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     qualityBoostNoLighting: ", rich composition, vivid saturated colors, high quality detailed illustration",
     styleConsistency: ", consistent painterly illustration style, uniform artistic rendering throughout",
     loraScale: 0.80,
-    loraScaleChild: 0.88
+    loraScaleChild: 0.88,
+    loraScaleSolo: 0.85,
+    loraScaleSoloChild: 0.93
   },
   ligne_claire: {
     positive: "ligne claire comic art style, clean precise ink outlines, flat cel colors, bright even lighting, clear readable panels, European bande dessinee style, Tintin inspired illustration, bold outlines, simple clean backgrounds",
@@ -20,7 +22,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     qualityBoostNoLighting: ", rich detailed composition, vivid bold flat colors, high quality clean illustration",
     styleConsistency: ", consistent clean-line illustration style, uniform artistic rendering throughout",
     loraScale: 0.78,
-    loraScaleChild: 0.85
+    loraScaleChild: 0.85,
+    loraScaleSolo: 0.83,
+    loraScaleSoloChild: 0.90
   },
   american_comic: {
     positive: "American superhero comic book art, bold ink outlines, dynamic composition, strong contrasting colors, Marvel DC style illustration, halftone dots, dramatic lighting, action comic panel, professional comic art",
@@ -29,7 +33,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     qualityBoostNoLighting: ", rich dynamic composition, vivid saturated colors, high quality detailed illustration",
     styleConsistency: ", consistent bold comic illustration style, uniform artistic rendering throughout",
     loraScale: 0.78,
-    loraScaleChild: 0.85
+    loraScaleChild: 0.85,
+    loraScaleSolo: 0.83,
+    loraScaleSoloChild: 0.90
   },
   watercolor: {
     positive: "cozy heartwarming 2D hand-drawn watercolor storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
@@ -38,7 +44,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     qualityBoostNoLighting: ", rich detailed composition, luminous glowing colors, high quality detailed illustration",
     styleConsistency: ", consistent hand-painted watercolor illustration style, uniform artistic rendering throughout",
     loraScale: 0.85,
-    loraScaleChild: 0.90
+    loraScaleChild: 0.90,
+    loraScaleSolo: 0.90,
+    loraScaleSoloChild: 0.95
   },
   noir: {
     positive: "black and white noir comic illustration, high contrast ink drawing, dramatic shadows, cross-hatching technique, graphic novel art style, Sin City inspired, expressive ink lines, moody atmosphere, detailed pen and ink illustration",
@@ -47,7 +55,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     qualityBoostNoLighting: ", rich detailed composition, high quality detailed illustration",
     styleConsistency: ", consistent ink-drawn illustration style, uniform artistic rendering throughout",
     loraScale: 0.78,
-    loraScaleChild: 0.85
+    loraScaleChild: 0.85,
+    loraScaleSolo: 0.83,
+    loraScaleSoloChild: 0.90
   },
   pop_art: {
     positive: "Roy Lichtenstein pop art comic style, bold black outlines, Ben-Day dots pattern, primary flat colors, retro comic book illustration, speech bubbles style, graphic pop art panel, strong graphic design aesthetic",
@@ -56,7 +66,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     qualityBoostNoLighting: ", bold dynamic composition, vivid saturated colors, high quality detailed illustration",
     styleConsistency: ", consistent graphic pop art illustration style, uniform artistic rendering throughout",
     loraScale: 0.75,
-    loraScaleChild: 0.82
+    loraScaleChild: 0.82,
+    loraScaleSolo: 0.80,
+    loraScaleSoloChild: 0.87
   }
 };
 
@@ -136,9 +148,18 @@ export async function POST(request: Request) {
 
     const finalPrompt = "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + style.styleConsistency;
 
-    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | Prompt: " + finalPrompt);
+    // Experiment B: extraLoraId is only ever set when the companion's trigger
+    // word is actually present in this prompt (see companionLoraIdForPrompt in
+    // app/skapa/page.tsx), so its absence combined with no multi-person
+    // keywords means this specific scene depicts the main character alone -
+    // the only case where a higher lora_scale carries no leakage risk to
+    // other people in frame.
+    const soloSceneBoostApplied = !extraLoraId && !multiPersonKeywords.test(cleanedPrompt);
+    const activeLoraScale = soloSceneBoostApplied
+      ? (isChild ? style.loraScaleSoloChild : style.loraScaleSolo)
+      : (isChild ? style.loraScaleChild : style.loraScale);
 
-    const activeLoraScale = isChild ? style.loraScaleChild : style.loraScale;
+    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,

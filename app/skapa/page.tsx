@@ -972,6 +972,14 @@ export default function Page() {
           <div style={{ maxWidth: '700px', margin: '6rem auto 1rem', padding: '1.5rem', background: '#fff3cd', border: '2px solid #e8b84b', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             <strong>DEBUG - markera all text här och klistra in i chatten:</strong>
             {'\n\n'}
+            savedModelDbId (databas-rad-ID): {savedModelDbId}
+            {'\n'}
+            charName: {charName}
+            {'\n'}
+            charTrigger: {charTrigger}
+            {'\n'}
+            trainedModelId: {trainedModelId}
+            {'\n'}
             charDesc: {charDesc}
             {'\n'}
             bookStyle: {bookStyle}

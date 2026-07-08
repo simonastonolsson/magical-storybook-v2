@@ -10,16 +10,18 @@ interface BookPageProps {
   totalPages: number;
   imageUrl: string | undefined;
   isGeneratingThisPanel: boolean;
-  isActive: boolean;
   onNarrationChange: (panelNumber: number, value: string) => void;
-  regenValue: string;
-  onRegenChange: (panelNumber: number, value: string) => void;
-  onRegenSubmit: (panelNumber: number, originalPrompt: string) => void;
-  isRegenLoading: boolean;
 }
 
+// The "Andra nagot i bilden" regenerate field used to live inside this
+// component, but react-pageflip's clickEventForward only whitelists <a> and
+// <button> tags - it calls preventDefault() on mousedown for anything else
+// (including <input>), which silently blocks the field from ever getting
+// focus. That control now lives outside HTMLFlipBook entirely (see
+// .book-external-regen), referencing currentPage instead of being bound to a
+// specific page's JSX.
 const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
-  { panel, totalPages, imageUrl, isGeneratingThisPanel, isActive, onNarrationChange, regenValue, onRegenChange, onRegenSubmit, isRegenLoading },
+  { panel, totalPages, imageUrl, isGeneratingThisPanel, onNarrationChange },
   ref
 ) {
   return (
@@ -40,23 +42,6 @@ const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
         value={panel.narration}
         onChange={(e) => onNarrationChange(panel.panel_number, e.target.value)}
       />
-      {isActive && imageUrl && (
-        <div className="book-page-regen">
-          <input
-            type="text"
-            placeholder="Andra nagot i bilden..."
-            value={regenValue}
-            onChange={(e) => onRegenChange(panel.panel_number, e.target.value)}
-            disabled={isRegenLoading}
-          />
-          <button
-            onClick={() => onRegenSubmit(panel.panel_number, panel.image_prompt)}
-            disabled={isRegenLoading || !regenValue?.trim()}
-          >
-            {isRegenLoading ? '...' : 'Uppdatera'}
-          </button>
-        </div>
-      )}
       <div className="book-page-number">{panel.panel_number} / {totalPages}</div>
     </div>
   );
@@ -698,7 +683,7 @@ export default function Page() {
         .comic-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; }
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .pdf-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .book-stage { background: #f6f2ea; min-height: 88vh; padding: 2rem clamp(24px, 8vw, 140px); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+        .book-stage { background: #f6f2ea; min-height: 88vh; padding: 2rem clamp(24px, 8vw, 140px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; box-sizing: border-box; }
         .book-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; }
         .book-shadow-wrapper { position: relative; box-shadow: 0 30px 70px rgba(26,26,46,0.35), 0 10px 26px rgba(26,26,46,0.22), 0 2px 8px rgba(26,26,46,0.18); border-radius: 6px; animation: bookRevealIn 0.45s ease; }
         .book-shadow-wrapper-single { overflow: hidden; }
@@ -712,11 +697,12 @@ export default function Page() {
         .book-page-img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .book-page-placeholder { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
         .book-page-text { width: 100%; background: transparent; border: none; outline: none; resize: none; font-family: Inter, sans-serif; font-size: 0.85rem; line-height: 1.5; color: #1a1a2e; padding: 0.5rem 0.15rem 0.25rem; flex-shrink: 0; }
-        .book-page-regen { display: flex; gap: 0.4rem; padding-top: 0.4rem; border-top: 1px solid #f0ebe0; flex-shrink: 0; }
-        .book-page-regen input { flex: 1; min-width: 0; padding: 0.4rem 0.6rem; border: 1.5px solid #e5e0d8; border-radius: 8px; font-size: 0.75rem; outline: none; font-family: Inter, sans-serif; }
-        .book-page-regen input:focus { border-color: #7c3aed; }
-        .book-page-regen button { flex-shrink: 0; padding: 0.4rem 0.75rem; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-        .book-page-regen button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .book-external-regen { display: flex; gap: 0.5rem; width: 100%; }
+        .book-external-regen input { flex: 1; min-width: 0; padding: 0.6rem 0.9rem; border: 1.5px solid #e5e0d8; border-radius: 100px; font-size: 0.85rem; outline: none; font-family: Inter, sans-serif; background: white; color: #1a1a2e; }
+        .book-external-regen input:focus { border-color: #7c3aed; }
+        .book-external-regen input:disabled { opacity: 0.6; cursor: not-allowed; }
+        .book-external-regen button { flex-shrink: 0; padding: 0.6rem 1.25rem; background: #7c3aed; color: white; border: none; border-radius: 100px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+        .book-external-regen button:disabled { opacity: 0.5; cursor: not-allowed; }
         .book-page-number { position: absolute; bottom: 6px; right: 10px; font-size: 0.7rem; color: #9ca3af; font-family: Inter, sans-serif; background: rgba(255,255,255,0.75); padding: 1px 7px; border-radius: 100px; }
         .book-cover { align-items: center; justify-content: center; }
         .book-cover-front { padding: 0; position: relative; background: #1a1a2e; }
@@ -1054,19 +1040,14 @@ export default function Page() {
                     disableFlipByClick={false}
                     ref={bookRef}
                   >
-                    {comic.panels.map((panel: any, index: number) => (
+                    {comic.panels.map((panel: any) => (
                       <BookPage
                         key={panel.panel_number}
                         panel={panel}
                         totalPages={comic.panels.length}
                         imageUrl={generatedImages[panel.panel_number]}
                         isGeneratingThisPanel={currentlyGeneratingPanel === panel.panel_number}
-                        isActive={index === currentPage}
                         onNarrationChange={handleNarrationChange}
-                        regenValue={customPrompts[panel.panel_number] || ''}
-                        onRegenChange={handleRegenChange}
-                        onRegenSubmit={handleRegeneratePanel}
-                        isRegenLoading={!!panelsLoading[panel.panel_number]}
                       />
                     ))}
                   </HTMLFlipBook>
@@ -1092,6 +1073,24 @@ export default function Page() {
                 </button>
               )}
             </div>
+
+            {bookView === 'reading' && comic.panels[currentPage] && generatedImages[comic.panels[currentPage].panel_number] && (
+              <div className="book-external-regen" style={{ maxWidth: bookSize.width }}>
+                <input
+                  type="text"
+                  placeholder="Andra nagot i bilden..."
+                  value={customPrompts[comic.panels[currentPage].panel_number] || ''}
+                  onChange={(e) => handleRegenChange(comic.panels[currentPage].panel_number, e.target.value)}
+                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number]}
+                />
+                <button
+                  onClick={() => handleRegeneratePanel(comic.panels[currentPage].panel_number, comic.panels[currentPage].image_prompt)}
+                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number] || !(customPrompts[comic.panels[currentPage].panel_number] || '').trim()}
+                >
+                  {panelsLoading[comic.panels[currentPage].panel_number] ? '...' : 'Uppdatera'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Full book, one page per printed sheet, only rendered for PDF/print export */}

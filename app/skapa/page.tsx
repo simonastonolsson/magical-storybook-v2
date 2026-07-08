@@ -10,18 +10,17 @@ interface BookPageProps {
   totalPages: number;
   imageUrl: string | undefined;
   isGeneratingThisPanel: boolean;
-  onNarrationChange: (panelNumber: number, value: string) => void;
 }
 
-// The "Andra nagot i bilden" regenerate field used to live inside this
-// component, but react-pageflip's clickEventForward only whitelists <a> and
-// <button> tags - it calls preventDefault() on mousedown for anything else
-// (including <input>), which silently blocks the field from ever getting
-// focus. That control now lives outside HTMLFlipBook entirely (see
-// .book-external-regen), referencing currentPage instead of being bound to a
-// specific page's JSX.
+// The narration textarea and the "Andra nagot i bilden" regenerate field used
+// to live inside this component, but react-pageflip's clickEventForward only
+// whitelists <a> and <button> tags - it calls preventDefault() on mousedown
+// for anything else (including <input>/<textarea>), which silently blocks
+// them from ever getting focus. Both controls now live outside HTMLFlipBook
+// entirely (see .book-external-controls), referencing currentPage instead of
+// being bound to a specific page's JSX.
 const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
-  { panel, totalPages, imageUrl, isGeneratingThisPanel, onNarrationChange },
+  { panel, totalPages, imageUrl, isGeneratingThisPanel },
   ref
 ) {
   return (
@@ -36,12 +35,6 @@ const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
           </div>
         )}
       </div>
-      <textarea
-        className="book-page-text"
-        rows={3}
-        value={panel.narration}
-        onChange={(e) => onNarrationChange(panel.panel_number, e.target.value)}
-      />
       <div className="book-page-number">{panel.panel_number} / {totalPages}</div>
     </div>
   );
@@ -383,10 +376,13 @@ export default function Page() {
     setIsGeneratingImages(false);
   };
 
+  const buildCoverPrompt = (title: string) =>
+    "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+
   const generateCoverImage = async (comicData: any, baseSeed: number) => {
     setIsGeneratingCover(true);
     try {
-      const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + comicData.title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+      const coverPrompt = buildCoverPrompt(comicData.title);
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -501,6 +497,46 @@ export default function Page() {
       }
     } catch (err) { console.error(err); }
     finally { setPanelsLoading(prev => ({ ...prev, [panelNumber]: false })); }
+  };
+
+  // Cover uses panel-number key 0 (real panel numbers start at 1) to share the
+  // same customPrompts/panelsLoading maps as regular panels instead of adding
+  // parallel state just for the cover.
+  const handleRegenerateCover = async () => {
+    const instruction = customPrompts[0];
+    if (!instruction?.trim() || !trainedModelId || !comic) return;
+    setPanelsLoading(prev => ({ ...prev, 0: true }));
+    try {
+      const refineRes = await fetch('/api/refine-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalPrompt: buildCoverPrompt(comic.title), instruction }),
+      });
+      if (!refineRes.ok) throw new Error("Refine failed");
+      const { refinedPrompt } = await refineRes.json();
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: refinedPrompt,
+          trainedModelId,
+          triggerWord: charTrigger,
+          charDesc,
+          charName,
+          charOutfit: customOutfit || charOutfit,
+          bookStyle,
+          referenceImageUrl,
+          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+          extraLoraScale: 0.8
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCoverImageUrl(data.imageUrl);
+        setCustomPrompts(prev => ({ ...prev, 0: '' }));
+      }
+    } catch (err) { console.error(err); }
+    finally { setPanelsLoading(prev => ({ ...prev, 0: false })); }
   };
 
   const totalSteps = 4;
@@ -697,6 +733,9 @@ export default function Page() {
         .book-page-img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .book-page-placeholder { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
         .book-page-text { width: 100%; background: transparent; border: none; outline: none; resize: none; font-family: Inter, sans-serif; font-size: 0.85rem; line-height: 1.5; color: #1a1a2e; padding: 0.5rem 0.15rem 0.25rem; flex-shrink: 0; }
+        .book-external-controls { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+        .book-external-narration { width: 100%; background: white; border: 1.5px solid #e5e0d8; border-radius: 12px; padding: 0.75rem 1rem; font-family: Inter, sans-serif; font-size: 0.9rem; line-height: 1.6; color: #1a1a2e; resize: none; outline: none; }
+        .book-external-narration:focus { border-color: #7c3aed; }
         .book-external-regen { display: flex; gap: 0.5rem; width: 100%; }
         .book-external-regen input { flex: 1; min-width: 0; padding: 0.6rem 0.9rem; border: 1.5px solid #e5e0d8; border-radius: 100px; font-size: 0.85rem; outline: none; font-family: Inter, sans-serif; background: white; color: #1a1a2e; }
         .book-external-regen input:focus { border-color: #7c3aed; }
@@ -1047,7 +1086,6 @@ export default function Page() {
                         totalPages={comic.panels.length}
                         imageUrl={generatedImages[panel.panel_number]}
                         isGeneratingThisPanel={currentlyGeneratingPanel === panel.panel_number}
-                        onNarrationChange={handleNarrationChange}
                       />
                     ))}
                   </HTMLFlipBook>
@@ -1074,21 +1112,51 @@ export default function Page() {
               )}
             </div>
 
-            {bookView === 'reading' && comic.panels[currentPage] && generatedImages[comic.panels[currentPage].panel_number] && (
-              <div className="book-external-regen" style={{ maxWidth: bookSize.width }}>
-                <input
-                  type="text"
-                  placeholder="Andra nagot i bilden..."
-                  value={customPrompts[comic.panels[currentPage].panel_number] || ''}
-                  onChange={(e) => handleRegenChange(comic.panels[currentPage].panel_number, e.target.value)}
-                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number]}
+            {bookView === 'reading' && comic.panels[currentPage] && (
+              <div className="book-external-controls" style={{ maxWidth: bookSize.width }}>
+                <textarea
+                  className="book-external-narration"
+                  rows={3}
+                  value={comic.panels[currentPage].narration}
+                  onChange={(e) => handleNarrationChange(comic.panels[currentPage].panel_number, e.target.value)}
                 />
-                <button
-                  onClick={() => handleRegeneratePanel(comic.panels[currentPage].panel_number, comic.panels[currentPage].image_prompt)}
-                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number] || !(customPrompts[comic.panels[currentPage].panel_number] || '').trim()}
-                >
-                  {panelsLoading[comic.panels[currentPage].panel_number] ? '...' : 'Uppdatera'}
-                </button>
+                {generatedImages[comic.panels[currentPage].panel_number] && (
+                  <div className="book-external-regen">
+                    <input
+                      type="text"
+                      placeholder="Andra nagot i bilden..."
+                      value={customPrompts[comic.panels[currentPage].panel_number] || ''}
+                      onChange={(e) => handleRegenChange(comic.panels[currentPage].panel_number, e.target.value)}
+                      disabled={!!panelsLoading[comic.panels[currentPage].panel_number]}
+                    />
+                    <button
+                      onClick={() => handleRegeneratePanel(comic.panels[currentPage].panel_number, comic.panels[currentPage].image_prompt)}
+                      disabled={!!panelsLoading[comic.panels[currentPage].panel_number] || !(customPrompts[comic.panels[currentPage].panel_number] || '').trim()}
+                    >
+                      {panelsLoading[comic.panels[currentPage].panel_number] ? '...' : 'Uppdatera'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {bookView === 'cover' && coverImageUrl && (
+              <div className="book-external-controls" style={{ maxWidth: bookSize.mobile ? bookSize.width : bookSize.width * 2 }}>
+                <div className="book-external-regen">
+                  <input
+                    type="text"
+                    placeholder="Andra nagot i bilden..."
+                    value={customPrompts[0] || ''}
+                    onChange={(e) => handleRegenChange(0, e.target.value)}
+                    disabled={!!panelsLoading[0]}
+                  />
+                  <button
+                    onClick={handleRegenerateCover}
+                    disabled={!!panelsLoading[0] || !(customPrompts[0] || '').trim()}
+                  >
+                    {panelsLoading[0] ? '...' : 'Uppdatera'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

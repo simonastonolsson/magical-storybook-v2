@@ -99,6 +99,7 @@ function BookCoverPage({ variant, title, imageUrl, isGenerating }: BookCoverProp
 }
 
 const BOOK_ASPECT = 1.5; // height / width, matches a 2:3 portrait page
+const COVER_ASPECT = 11 / 8; // ~1.375:1, an 8x11in single-page cover/back-cover
 const MOBILE_BREAKPOINT = 768;
 
 function computeBookSize() {
@@ -395,7 +396,7 @@ export default function Page() {
     try {
       const heroPanel = comicData.panels[0];
       const sceneHint = extractSceneHint(heroPanel?.image_prompt, charDesc);
-      const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, layered composition with a detailed background scene evoking the story '" + comicData.title + "', small-scale background elements hinting at the plot: " + sceneHint + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+      const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + comicData.title + "', small-scale background elements hinting at the plot: " + sceneHint + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -964,7 +965,10 @@ export default function Page() {
           <div className="book-stage">
             <div
               className="book-wrapper"
-              style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
+              style={{
+                width: bookView === 'reading' && !bookSize.mobile ? bookSize.width * 2 : bookSize.width,
+                height: bookSize.height,
+              }}
             >
               {!(bookView === 'cover') && (
                 <button
@@ -979,7 +983,7 @@ export default function Page() {
               {bookView === 'cover' && (
                 <div
                   className="book-shadow-wrapper book-shadow-wrapper-single"
-                  style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
+                  style={{ width: bookSize.width, height: bookSize.width * COVER_ASPECT }}
                 >
                   <BookCoverPage variant="front" title={comic.title} imageUrl={coverImageUrl} isGenerating={isGeneratingCover} />
                 </div>
@@ -1039,7 +1043,7 @@ export default function Page() {
               {bookView === 'back-cover' && (
                 <div
                   className="book-shadow-wrapper book-shadow-wrapper-single"
-                  style={{ width: bookSize.mobile ? bookSize.width : bookSize.width * 2, height: bookSize.height }}
+                  style={{ width: bookSize.width, height: bookSize.width * COVER_ASPECT }}
                 >
                   <BookCoverPage variant="back" title={comic.title} />
                 </div>

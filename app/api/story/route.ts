@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       ? `There is also a companion in the story: ${secondaryTrigger}.
          The companion's Name is "${secondaryName}".
          The companion's UNIQUE Trigger Word is "${secondaryTriggerWord}".
-         You MUST include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (using their unique trigger word: "${secondaryTriggerWord}").`
+         You MUST include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (using their unique trigger word: "${secondaryTriggerWord}"). Their described appearance must also remain fixed throughout every panel, with no age, gender, or species drift.`
       : "There are no other main companions in this story.";
 
     const fullPrompt = `You are an expert comic book director. Create a dynamic comic book script based on the user's idea: "${prompt}".
@@ -63,8 +63,12 @@ export async function POST(req: Request) {
          - If the companion is in the scene, use their trigger word EXACTLY ONCE as well.
          - Writing a trigger word twice in one prompt will cause the AI to draw two copies of the same character. This is forbidden.
          - Double-check every image_prompt before writing it: count how many times "${trigger}" appears and ensure it is exactly 1.
+      7. APPEARANCE LOCKING (STRICT CONSISTENCY RULE):
+         - The character's appearance is fixed as exactly "${desc}" for the ENTIRE story, in every single panel, with zero exceptions.
+         - Do not age the character up or down, do not change their gender, species, or any physical trait, and do not alter this description based on the scene, activity, time of day, or mood - a panel showing them asleep, playing, or in danger must still describe them as exactly "${desc}".
+         - This rule applies identically no matter what "${desc}" actually is - whether it describes a child, an adult, or an animal. Never substitute your own assumption about age or appearance for what is explicitly given here.
 
-      CRITICAL IMAGE_PROMPT RULES (Write in English, consistent watercolor storybook style):
+      CRITICAL IMAGE_PROMPT RULES (Write in English, describing only the scene and action - the illustration's visual style is applied separately later in the pipeline):
       1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
       2. CAMERA FRAMING RULE:
          - Always use explicit out-zooming descriptions: "wide angle", "shot from a distance", "establishing shot", "action shot", "three-quarter body shot showing the characters engaged in...", "three-quarter face view".

@@ -377,7 +377,7 @@ export default function Page() {
     setIsGeneratingCover(true);
     try {
       const heroPanel = comicData.panels[0];
-      const coverPrompt = "Comic book cover art, " + charTrigger + " in a dramatic heroic pose capturing the essence of the story '" + comicData.title + "', eye-catching composition, dynamic lighting, title-ready framing with clear space at top for text, " + (heroPanel?.image_prompt || '') + ", bold attention-grabbing cover illustration";
+      const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, layered composition with a detailed background scene evoking the story '" + comicData.title + "', small-scale background elements hinting at the plot: " + (heroPanel?.image_prompt || '') + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -682,9 +682,9 @@ export default function Page() {
         .book-cover-front { padding: 0; position: relative; background: #1a1a2e; }
         .book-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
         .book-cover-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
-        .book-cover-overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; gap: 0.5rem; height: 100%; padding: 1.75rem 1.5rem; background: linear-gradient(to top, rgba(26,26,46,0.92) 0%, rgba(26,26,46,0.55) 40%, rgba(26,26,46,0) 78%); }
-        .book-cover-eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #e8b84b; }
-        .book-cover-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; color: white; line-height: 1.2; }
+        .book-cover-overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; gap: 0.75rem; height: 100%; padding: 2rem 1.75rem 2.25rem; background: linear-gradient(to top, rgba(10,10,20,0.95) 0%, rgba(10,10,20,0.78) 32%, rgba(10,10,20,0.4) 58%, rgba(10,10,20,0) 88%); }
+        .book-cover-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(232,184,75,0.85); }
+        .book-cover-title { font-family: 'Playfair Display', serif; font-size: clamp(2.4rem, 6.5vw, 4.75rem); font-weight: 900; color: white; line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; text-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 10px 32px rgba(0,0,0,0.6); }
         .book-cover-back { background: #1a1a2e; }
         .book-cover-back-label { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: rgba(255,255,255,0.6); letter-spacing: 0.08em; }
         .book-spine { position: absolute; top: 3%; bottom: 3%; left: 50%; width: 60px; margin-left: -30px; background: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 30%, rgba(0,0,0,0.24) 50%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0) 100%); pointer-events: none; z-index: 6; }

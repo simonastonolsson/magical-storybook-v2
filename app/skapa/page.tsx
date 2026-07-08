@@ -671,9 +671,9 @@ export default function Page() {
         .book-page-number { position: absolute; bottom: 6px; right: 10px; font-size: 0.7rem; color: #9ca3af; font-family: Inter, sans-serif; background: rgba(255,255,255,0.75); padding: 1px 7px; border-radius: 100px; }
         .book-cover { align-items: center; justify-content: center; }
         .book-cover-front { padding: 0; position: relative; background: #1a1a2e; }
-        .book-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-        .book-cover-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
-        .book-cover-overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; gap: 0.75rem; height: 100%; padding: 2rem 1.75rem 2.25rem; background: linear-gradient(to top, rgba(10,10,20,0.95) 0%, rgba(10,10,20,0.78) 32%, rgba(10,10,20,0.4) 58%, rgba(10,10,20,0) 88%); }
+        .book-cover-img { flex: 1; min-height: 0; width: 100%; display: block; object-fit: cover; }
+        .book-cover-placeholder { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
+        .book-cover-overlay { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; gap: 0.75rem; padding: 2rem 1.75rem 2.25rem; background: linear-gradient(to top, rgba(10,10,20,0.95) 0%, rgba(10,10,20,0.78) 32%, rgba(10,10,20,0.4) 58%, rgba(10,10,20,0) 88%); }
         .book-cover-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(232,184,75,0.85); }
         .book-cover-title { font-family: 'Playfair Display', serif; font-size: clamp(2.4rem, 6.5vw, 4.75rem); font-weight: 900; color: white; line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; text-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 10px 32px rgba(0,0,0,0.6); }
         .book-cover-back { background: #1a1a2e; }
@@ -696,6 +696,7 @@ export default function Page() {
           @page { size: 8in 11in; margin: 0; }
           .wiz-nav, .wiz-progress, .wiz-footer, .book-stage { display: none !important; }
           .print-only { display: block !important; }
+          .print-only, .print-only * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
         }
         @media (max-width: 600px) {
           .wiz-grid-2 { grid-template-columns: 1fr; }

@@ -991,27 +991,6 @@ export default function Page() {
 
       {comic && (
         <>
-          {/* TEMPORARY DEBUG BOX - markera all text i rutan nedan och klistra in i chatten, ta sedan bort denna ruta */}
-          <div style={{ maxWidth: '700px', margin: '6rem auto 1rem', padding: '1.5rem', background: '#fff3cd', border: '2px solid #e8b84b', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            <strong>DEBUG - markera all text här och klistra in i chatten:</strong>
-            {'\n\n'}
-            savedModelDbId (databas-rad-ID): {savedModelDbId}
-            {'\n'}
-            charName: {charName}
-            {'\n'}
-            charTrigger: {charTrigger}
-            {'\n'}
-            trainedModelId: {trainedModelId}
-            {'\n'}
-            charDesc: {charDesc}
-            {'\n'}
-            bookStyle: {bookStyle}
-            {'\n'}
-            Titel: {comic.title}
-            {'\n\n'}
-            {comic.panels.map((p: any) => 'Panel ' + p.panel_number + ': ' + p.image_prompt + '\n\n').join('')}
-          </div>
-
           <div className="comic-header">
             <h1 className="comic-title">{comic.title}</h1>
           </div>

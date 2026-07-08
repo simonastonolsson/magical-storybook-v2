@@ -342,7 +342,7 @@ export default function Page() {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const generateImagesForComic = async (comicData: any) => {
+  const generateImagesForComic = async (comicData: any, baseSeed: number) => {
     setIsGeneratingImages(true);
     for (let i = 0; i < comicData.panels.length; i++) {
       const panel = comicData.panels[i];
@@ -362,7 +362,8 @@ export default function Page() {
             bookStyle,
             referenceImageUrl,
             extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
-            extraLoraScale: 0.8
+            extraLoraScale: 0.8,
+            seed: baseSeed + i + 1
           }),
         });
         if (response.ok) {
@@ -375,7 +376,7 @@ export default function Page() {
     setIsGeneratingImages(false);
   };
 
-  const generateCoverImage = async (comicData: any) => {
+  const generateCoverImage = async (comicData: any, baseSeed: number) => {
     setIsGeneratingCover(true);
     try {
       const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + comicData.title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
@@ -392,7 +393,8 @@ export default function Page() {
           bookStyle,
           referenceImageUrl,
           extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
-          extraLoraScale: 0.8
+          extraLoraScale: 0.8,
+          seed: baseSeed
         }),
       });
       if (response.ok) {
@@ -444,8 +446,9 @@ export default function Page() {
       if (!response.ok) throw new Error('Server error');
       const data = await response.json();
       setComic(data.comic);
-      await generateCoverImage(data.comic);
-      generateImagesForComic(data.comic);
+      const baseSeed = Math.floor(Math.random() * 2147483647);
+      await generateCoverImage(data.comic, baseSeed);
+      generateImagesForComic(data.comic, baseSeed);
     } catch (err) {
       console.error(err);
       alert("Nagot gick snett, forsok igen.");

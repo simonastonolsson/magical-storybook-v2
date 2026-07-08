@@ -353,6 +353,18 @@ export default function Page() {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Experiment C: useCustomCompanionAI/companionModelId being set means the
+  // companion feature is enabled for the book, but not that the companion
+  // actually appears in a given panel's own prompt. Blending the companion's
+  // LoRA into every single generation call (even solo-character scenes) risks
+  // interfering with the main character's fidelity, so only include it when
+  // the companion's trigger word is actually present in that specific prompt.
+  const companionLoraIdForPrompt = (promptText: string) => {
+    if (!useCustomCompanionAI || !companionModelId) return null;
+    const companionTriggerWord = companionName.replace(/[^a-zA-Z]/g, "").toUpperCase() + 'TOK';
+    return new RegExp(companionTriggerWord, 'i').test(promptText || '') ? companionModelId : null;
+  };
+
   const generateImagesForComic = async (comicData: any, baseSeed: number) => {
     setIsGeneratingImages(true);
     for (let i = 0; i < comicData.panels.length; i++) {
@@ -372,7 +384,7 @@ export default function Page() {
             charOutfit: customOutfit || charOutfit,
             bookStyle,
             referenceImageUrl,
-            extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+            extraLoraId: companionLoraIdForPrompt(panel.image_prompt),
             extraLoraScale: 0.8,
             seed: baseSeed + i + 1
           }),
@@ -406,7 +418,7 @@ export default function Page() {
           charOutfit: customOutfit || charOutfit,
           bookStyle,
           referenceImageUrl,
-          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+          extraLoraId: companionLoraIdForPrompt(coverPrompt),
           extraLoraScale: 0.8,
           seed: baseSeed
         }),
@@ -493,7 +505,7 @@ export default function Page() {
           charOutfit: customOutfit || charOutfit,
           bookStyle,
           referenceImageUrl,
-          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+          extraLoraId: companionLoraIdForPrompt(refinedPrompt),
           extraLoraScale: 0.8
         }),
       });
@@ -537,7 +549,7 @@ export default function Page() {
           charOutfit: customOutfit || charOutfit,
           bookStyle,
           referenceImageUrl,
-          extraLoraId: (useCustomCompanionAI && companionModelId) ? companionModelId : null,
+          extraLoraId: companionLoraIdForPrompt(refinedPrompt),
           extraLoraScale: 0.8
         }),
       });

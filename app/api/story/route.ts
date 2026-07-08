@@ -67,6 +67,24 @@ export async function POST(req: Request) {
          - The character's appearance is fixed as exactly "${desc}" for the ENTIRE story, in every single panel, with zero exceptions.
          - Do not age the character up or down, do not change their gender, species, or any physical trait, and do not alter this description based on the scene, activity, time of day, or mood - a panel showing them asleep, playing, or in danger must still describe them as exactly "${desc}".
          - This rule applies identically no matter what "${desc}" actually is - whether it describes a child, an adult, or an animal. Never substitute your own assumption about age or appearance for what is explicitly given here.
+      8. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
+         - Write a "cover_scene": exactly ONE sentence, in ENGLISH, describing a specific,
+           iconic moment or pose that is genuinely representative of the story you just
+           wrote in the panels array above - not a generic, unrelated action pose.
+         - Base it on the actual plot: pick the moment, activity, or mood that best
+           captures what this particular story is about (e.g. a cooking story should show
+           the character cooking or presenting a finished dish, a calm bedtime story should
+           show a calm, cozy pose, an adventure story can show a dynamic action pose only if
+           the story is actually about adventure).
+         - Describe ONLY the pose, action, and immediate setting/environment (e.g.
+           "standing proudly over a finished gourmet dish in a warmly lit kitchen, holding
+           a wooden spoon triumphantly").
+         - Do NOT mention or describe the character's physical appearance, age, gender,
+           species, body type, or outfit in "cover_scene" - that is handled separately
+           elsewhere in the pipeline and must not be repeated, changed, or contradicted here.
+         - Do NOT include the trigger word "${trigger}" anywhere in "cover_scene" - it is
+           added automatically immediately before this text when building the final cover
+           image prompt.
 
       CRITICAL IMAGE_PROMPT RULES (Write in English, describing only the scene and action - the illustration's visual style is applied separately later in the pipeline):
       1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
@@ -80,6 +98,7 @@ export async function POST(req: Request) {
       Return ONLY a JSON object with this exact structure:
       {
         "title": "A beautiful title in the prompts language",
+        "cover_scene": "One sentence in English describing an iconic pose/setting from THIS story - no appearance, age, gender, or outfit details, and no trigger word",
         "panels": [
           {
             "panel_number": 1,

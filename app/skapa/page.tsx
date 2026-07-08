@@ -387,13 +387,13 @@ export default function Page() {
     setIsGeneratingImages(false);
   };
 
-  const buildCoverPrompt = (title: string) =>
-    "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+  const buildCoverPrompt = (title: string, coverScene: string) =>
+    "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " " + (coverScene || "in a dynamic heroic action pose, mid-motion, dramatic angle") + ", waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
 
   const generateCoverImage = async (comicData: any, baseSeed: number) => {
     setIsGeneratingCover(true);
     try {
-      const coverPrompt = buildCoverPrompt(comicData.title);
+      const coverPrompt = buildCoverPrompt(comicData.title, comicData.cover_scene);
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -521,7 +521,7 @@ export default function Page() {
       const refineRes = await fetch('/api/refine-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalPrompt: buildCoverPrompt(comic.title), instruction }),
+        body: JSON.stringify({ originalPrompt: buildCoverPrompt(comic.title, comic.cover_scene), instruction }),
       });
       if (!refineRes.ok) throw new Error("Refine failed");
       const { refinedPrompt } = await refineRes.json();

@@ -124,6 +124,13 @@ export async function POST(req: Request) {
 
     const comicData = JSON.parse(text);
 
+    // TEMPORARY DIAGNOSTIC LOGGING - remove once the age-drift fix is confirmed via a real test.
+    console.log("[STORY DEBUG] charDesc sent to Gemini:", desc);
+    console.log("[STORY DEBUG] title:", comicData.title);
+    (comicData.panels || []).forEach((p: any) => {
+      console.log(`[STORY DEBUG] panel ${p.panel_number} image_prompt:`, p.image_prompt);
+    });
+
     return new Response(JSON.stringify({ comic: comicData }), {
       headers: { "Content-Type": "application/json" },
     });

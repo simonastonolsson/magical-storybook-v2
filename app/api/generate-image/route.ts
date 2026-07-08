@@ -97,14 +97,11 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.replace(/basketball|basketboll/gi, "basketball");
     }
 
-    const closeUpKeywords = /close-up|closeup|waist-up|portrait shot|three-quarter body shot/i;
-    const closeUpReinforcement = closeUpKeywords.test(cleanedPrompt)
-      ? (isChild
-          ? ", character's exact childlike facial features and proportions preserved, do not age up"
-          : ", character's exact facial features, bone structure and apparent age preserved from reference photos, do not age down or age up")
-      : "";
+    const identityReinforcement = isChild
+      ? ", character's exact childlike facial features and proportions preserved, do not age up"
+      : ", character's exact facial features, bone structure and apparent age preserved from reference photos, do not age down or age up";
 
-    const finalPrompt = "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + closeUpReinforcement;
+    const finalPrompt = "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement;
 
     console.log("Style: " + styleKey + " | Prompt: " + finalPrompt);
 

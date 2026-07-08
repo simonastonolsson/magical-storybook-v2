@@ -611,6 +611,11 @@ export default function Page() {
         console.log('[PRINT DEBUG] print-only cover <img>.complete:', printCoverImg.complete);
         console.log('[PRINT DEBUG] print-only cover <img>.naturalWidth:', printCoverImg.naturalWidth);
         console.log('[PRINT DEBUG] print-only cover <img>.naturalHeight:', printCoverImg.naturalHeight);
+        console.log('[PRINT DEBUG] cover img rect:', JSON.stringify(printCoverImg.getBoundingClientRect()));
+        const parentEl = printCoverImg.parentElement;
+        console.log('[PRINT DEBUG] parent rect:', parentEl ? JSON.stringify(parentEl.getBoundingClientRect()) : 'no parent found');
+        const grandparentEl = parentEl?.parentElement;
+        console.log('[PRINT DEBUG] grandparent rect:', grandparentEl ? JSON.stringify(grandparentEl.getBoundingClientRect()) : 'no grandparent found');
       }
 
       window.print();
@@ -721,6 +726,10 @@ export default function Page() {
           .wiz-nav, .wiz-progress, .wiz-footer, .book-stage { display: none !important; }
           .print-only { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; clip: auto !important; white-space: normal !important; display: block !important; }
           .print-only, .print-only * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+          /* TEMPORARY DIAGNOSTIC - remove once the Safari print cover-image bug is root-caused. */
+          .print-page-cover .book-cover-img { outline: 4px solid red !important; }
+          .print-page-cover.print-page { outline: 4px solid blue !important; }
+          .print-page-cover .book-cover-front { outline: 4px solid lime !important; }
         }
         @media (max-width: 600px) {
           .wiz-grid-2 { grid-template-columns: 1fr; }

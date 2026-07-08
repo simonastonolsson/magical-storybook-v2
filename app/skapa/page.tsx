@@ -532,33 +532,19 @@ export default function Page() {
 
   const outfits = isChild ? childOutfits : adultOutfits;
 
-  const renderPanelCard = (panel: any) => (
-    <div key={panel.panel_number} className="panel-card">
-      <div style={{position:'relative'}}>
+  const renderPrintPage = (panel: any) => (
+    <div key={panel.panel_number} className="print-page print-page-panel">
+      <div className="book-page-image-wrap">
         {generatedImages[panel.panel_number] ? (
-          <img src={generatedImages[panel.panel_number]} alt={'Panel ' + panel.panel_number} className="panel-img" />
+          <img src={generatedImages[panel.panel_number]} alt={'Sida ' + panel.panel_number} className="book-page-img" />
         ) : (
-          <div className="panel-placeholder">
-            <span style={{fontSize:'2rem'}}>{currentlyGeneratingPanel === panel.panel_number ? '🎨' : '⏳'}</span>
-            <span style={{fontSize:'0.8rem', color:'#9ca3af'}}>{currentlyGeneratingPanel === panel.panel_number ? 'Ritar...' : 'Vantar...'}</span>
-          </div>
-        )}
-        <div className="panel-num">{panel.panel_number}</div>
-      </div>
-      <div className="panel-body">
-        <textarea className="panel-text" rows={3} value={panel.narration} onChange={(e) => {
-          const val = e.target.value;
-          setComic((prev: any) => ({ ...prev, panels: prev.panels.map((p: any) => p.panel_number === panel.panel_number ? { ...p, narration: val } : p) }));
-        }} />
-        {generatedImages[panel.panel_number] && (
-          <div className="panel-regen">
-            <input type="text" placeholder="Andra nagot i bilden..." value={customPrompts[panel.panel_number] || ''} onChange={(e) => setCustomPrompts(prev => ({ ...prev, [panel.panel_number]: e.target.value }))} disabled={panelsLoading[panel.panel_number]} />
-            <button onClick={() => handleRegeneratePanel(panel.panel_number, panel.image_prompt)} disabled={panelsLoading[panel.panel_number] || !customPrompts[panel.panel_number]?.trim()}>
-              {panelsLoading[panel.panel_number] ? '...' : 'Uppdatera'}
-            </button>
+          <div className="book-page-placeholder">
+            <span style={{fontSize:'2rem'}}>⏳</span>
           </div>
         )}
       </div>
+      <p className="book-page-text">{panel.narration}</p>
+      <div className="print-page-footer">{panel.panel_number}</div>
     </div>
   );
 
@@ -660,20 +646,6 @@ export default function Page() {
         .wiz-summary-key { color: #6b7280; }
         .wiz-summary-val { font-weight: 600; color: #1a1a2e; }
         .wiz-delete-link { font-size: 0.75rem; color: #ef4444; background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; margin-top: 0.5rem; }
-        .comic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem 6rem; }
-        .panel-card { background: white; border: 3px solid #1a1a2e; border-radius: 16px; overflow: hidden; box-shadow: 5px 5px 0 #1a1a2e; }
-        .panel-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
-        .panel-placeholder { width: 100%; aspect-ratio: 4/3; background: #f3f0eb; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
-        .panel-num { position: absolute; top: 8px; left: 8px; width: 30px; height: 30px; background: #e8b84b; border: 2px solid #1a1a2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; z-index: 2; }
-        .panel-body { padding: 1rem; background: #fffbeb; }
-        .panel-text { width: 100%; background: transparent; border: 1.5px dashed transparent; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; color: #1a1a2e; resize: none; outline: none; font-family: Inter, sans-serif; padding: 0.4rem; transition: all 0.15s; }
-        .panel-text:hover { border-color: #ddd6fe; }
-        .panel-text:focus { border-color: #7c3aed; background: white; }
-        .panel-regen { display: flex; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #fde68a; }
-        .panel-regen input { flex: 1; padding: 0.5rem 0.75rem; border: 1.5px solid #e5e0d8; border-radius: 8px; font-size: 0.85rem; outline: none; font-family: Inter, sans-serif; }
-        .panel-regen input:focus { border-color: #7c3aed; }
-        .panel-regen button { padding: 0.5rem 1rem; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
-        .panel-regen button:disabled { opacity: 0.5; cursor: not-allowed; }
         .comic-header { max-width: 1000px; margin: 0 auto; padding: 5rem 1.5rem 0; display: none; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
         .comic-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; }
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
@@ -713,16 +685,20 @@ export default function Page() {
         .book-nav-arrow-left { left: -76px; }
         .book-nav-arrow-right { right: -76px; }
         .print-only { display: none; }
+        .print-page { width: 8in; height: 11in; box-sizing: border-box; overflow: hidden; background: white; page-break-after: always; break-after: page; }
+        .print-page:last-child { page-break-after: auto; break-after: auto; }
+        .print-page-panel { display: flex; flex-direction: column; padding: 0.5in; gap: 0.3in; }
+        .print-page-panel .book-page-image-wrap { flex: 1; min-height: 0; }
+        .print-page-panel .book-page-text { flex-shrink: 0; font-size: 13pt; padding: 0; }
+        .print-page-cover { position: relative; padding: 0; }
+        .print-page-footer { text-align: center; font-family: Inter, sans-serif; font-size: 10pt; color: #9ca3af; flex-shrink: 0; }
         @media print {
-          .wiz-nav, .wiz-progress, .wiz-footer, .comic-header .pdf-btn, .panel-regen, .book-stage { display: none !important; }
-          .print-only { display: grid !important; }
-          .comic-header { display: flex !important; }
-          .comic-grid { grid-template-columns: 1fr 1fr; gap: 15px; padding: 0; }
-          .panel-card { box-shadow: none; border: 3px solid black; break-inside: avoid; }
+          @page { size: 8in 11in; margin: 0; }
+          .wiz-nav, .wiz-progress, .wiz-footer, .book-stage { display: none !important; }
+          .print-only { display: block !important; }
         }
         @media (max-width: 600px) {
           .wiz-grid-2 { grid-template-columns: 1fr; }
-          .comic-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 768px) {
           .book-spine { display: none; }
@@ -1061,9 +1037,15 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Full book, only rendered for PDF/print export */}
-          <div className="comic-grid print-only">
-            {comic.panels.map((panel: any) => renderPanelCard(panel))}
+          {/* Full book, one page per printed sheet, only rendered for PDF/print export */}
+          <div className="print-only">
+            <div className="print-page print-page-cover">
+              <BookCoverPage variant="front" title={comic.title} imageUrl={coverImageUrl} />
+            </div>
+            {comic.panels.map((panel: any) => renderPrintPage(panel))}
+            <div className="print-page print-page-cover">
+              <BookCoverPage variant="back" title={comic.title} />
+            </div>
           </div>
         </>
       )}

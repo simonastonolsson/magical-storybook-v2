@@ -684,7 +684,7 @@ export default function Page() {
         .book-nav-arrow:disabled { opacity: 0.15; cursor: default; pointer-events: none; }
         .book-nav-arrow-left { left: -76px; }
         .book-nav-arrow-right { right: -76px; }
-        .print-only { display: none; }
+        .print-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
         .print-page { width: 8in; height: 11in; box-sizing: border-box; overflow: hidden; background: white; page-break-after: always; break-after: page; }
         .print-page:last-child { page-break-after: auto; break-after: auto; }
         .print-page-panel { display: flex; flex-direction: column; padding: 0.5in; gap: 0.3in; }
@@ -695,7 +695,7 @@ export default function Page() {
         @media print {
           @page { size: 8in 11in; margin: 0; }
           .wiz-nav, .wiz-progress, .wiz-footer, .book-stage { display: none !important; }
-          .print-only { display: block !important; }
+          .print-only { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; clip: auto !important; white-space: normal !important; display: block !important; }
           .print-only, .print-only * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
         }
         @media (max-width: 600px) {

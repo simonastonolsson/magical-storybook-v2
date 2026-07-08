@@ -141,6 +141,7 @@ export default function Page() {
   const [trainedModelId, setTrainedModelId] = useState<string | null>(null);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [savedModelDbId, setSavedModelDbId] = useState<string | null>(null);
+  const [charDescSaveStatus, setCharDescSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const [charName, setCharacterName] = useState('');
   const [charDesc, setCharacterDescription] = useState('an adult man');
@@ -218,6 +219,25 @@ export default function Page() {
 
   const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) setSelectedFiles(Array.from(e.target.files));
+  };
+
+  const handleCharDescChange = async (newDesc: string) => {
+    setCharacterDescription(newDesc);
+    if (!savedModelDbId) return;
+    setCharDescSaveStatus('saving');
+    try {
+      const res = await fetch(`/api/user-models/${savedModelDbId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ char_desc: newDesc }),
+      });
+      setCharDescSaveStatus(res.ok ? 'saved' : 'error');
+    } catch (err) {
+      console.error('Failed to update saved character description', err);
+      setCharDescSaveStatus('error');
+    } finally {
+      setTimeout(() => setCharDescSaveStatus('idle'), 2500);
+    }
   };
 
   const handleCompanionFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -777,7 +797,7 @@ export default function Page() {
                   </div>
                   <div>
                     <label className="wiz-label">Karaktarstyp</label>
-                    <select className="wiz-select" value={charDesc} onChange={(e) => setCharacterDescription(e.target.value)}>
+                    <select className="wiz-select" value={charDesc} onChange={(e) => handleCharDescChange(e.target.value)}>
                       <option value="an adult man">Vuxen man</option>
                       <option value="an adult woman">Vuxen kvinna</option>
                       <option value="a young boy">Pojke</option>
@@ -785,6 +805,9 @@ export default function Page() {
                       <option value="a friendly dog">Hund</option>
                       <option value="a cute fluffy cat">Katt</option>
                     </select>
+                    {charDescSaveStatus === 'saving' && <span style={{fontSize:'0.75rem', color:'#6b7280', marginTop:'0.35rem', display:'block'}}>Sparar...</span>}
+                    {charDescSaveStatus === 'saved' && <span style={{fontSize:'0.75rem', color:'#065f46', marginTop:'0.35rem', display:'block'}}>Sparat!</span>}
+                    {charDescSaveStatus === 'error' && <span style={{fontSize:'0.75rem', color:'#ef4444', marginTop:'0.35rem', display:'block'}}>Kunde inte spara, forsok igen</span>}
                   </div>
                 </div>
 

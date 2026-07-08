@@ -88,9 +88,22 @@ export async function POST(req: Request) {
 
       CRITICAL IMAGE_PROMPT RULES (Write in English, describing only the scene and action - the illustration's visual style is applied separately later in the pipeline):
       1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
-      2. CAMERA FRAMING RULE:
-         - Always use explicit out-zooming descriptions: "wide angle", "shot from a distance", "establishing shot", "action shot", "three-quarter body shot showing the characters engaged in...", "three-quarter face view".
-         - Ensure substantial empty headroom above the characters hair so they are never cropped out.
+      2. CAMERA FRAMING RULE (STRICT CONSISTENCY RULE - facial resemblance depends on this):
+         - Prioritize CLOSER compositions that keep the character's face large in frame:
+           "waist-up medium shot", "medium close-up", "three-quarter face view, waist-up".
+           Use these for the MAJORITY of panels - at least half of the total ${finalPageCount}
+           panels in this story.
+         - Reserve wide/distant framing ("wide angle", "shot from a distance", "establishing
+           shot") for occasional scene-setting panels only - e.g. the first panel introducing
+           a new location, or a panel where the character is deliberately small/distant for
+           storytelling reasons. Never use it for a panel where the character's face or
+           expression is the emotional focus of that moment.
+         - Never combine a wide/distant phrase ("wide angle", "shot from a distance",
+           "establishing shot") and a close phrase ("waist-up", "medium close-up",
+           "three-quarter face view") in the same image_prompt - choose ONE framing per
+           panel, they contradict each other.
+         - Ensure substantial empty headroom above the character's hair so they are never
+           cropped out, regardless of framing choice.
       3. Use the correct trigger words and descriptions naturally inside the actions:
          - If only ${name} is in the scene: include "drawing of ${trigger}, ${desc}, ${signatureOutfit}, three-quarter face view, looking away from the camera, [DOING SOME SPECIFIC ACTION]".
          - If BOTH are in the scene: include them together, interacting or doing an activity (e.g., "drawing of ${trigger}, ${desc}, ${signatureOutfit}, and ${secondaryTriggerWord || "COMPANIONTOK"}, both in three-quarter view, laughing and talking together while [DOING SOME SPECIFIC ACTION]").
@@ -103,7 +116,7 @@ export async function POST(req: Request) {
           {
             "panel_number": 1,
             "narration": "Narration text in the prompts language...",
-            "image_prompt": "Comic book panel illustration, graphic novel art, wide-angle action shot from a distance of the first subject ${trigger}, ${desc}, ${signatureOutfit}, three-quarter face view, with substantial empty headroom, looking away from the camera, engaged in..."
+            "image_prompt": "Comic book panel illustration, graphic novel art, waist-up three-quarter view medium shot of the first subject ${trigger}, ${desc}, ${signatureOutfit}, with substantial empty headroom, looking away from the camera, engaged in..."
           }
         ]
       }`;

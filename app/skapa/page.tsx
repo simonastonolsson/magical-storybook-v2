@@ -147,6 +147,7 @@ export default function Page() {
   const [comic, setComic] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingScript, setIsLoadingScript] = useState(false);
+  const [isPreparingPrint, setIsPreparingPrint] = useState(false);
   const [pageCount, setPageCount] = useState<number>(8);
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -594,6 +595,30 @@ export default function Page() {
     }
   };
 
+  const preloadImage = (url: string): Promise<void> => {
+    const img = new Image();
+    img.src = url;
+    return img.decode().catch(() => {});
+  };
+
+  const handlePrint = async () => {
+    setIsPreparingPrint(true);
+    try {
+      const urls: string[] = [];
+      if (coverImageUrl) urls.push(coverImageUrl);
+      if (comic) {
+        comic.panels.forEach((panel: any) => {
+          const url = generatedImages[panel.panel_number];
+          if (url) urls.push(url);
+        });
+      }
+      await Promise.all(urls.map(preloadImage));
+    } finally {
+      setIsPreparingPrint(false);
+      window.print();
+    }
+  };
+
   return (
     <main style={{minHeight:'100vh', background:'#faf8f3', fontFamily:'Inter, sans-serif', color:'#1a1a2e'}}>
       <style>{`
@@ -649,6 +674,7 @@ export default function Page() {
         .comic-header { max-width: 1000px; margin: 0 auto; padding: 5rem 1.5rem 0; display: none; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
         .comic-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; }
         .pdf-btn { padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 100px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+        .pdf-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .book-stage { background: #f6f2ea; min-height: 88vh; padding: 2rem clamp(24px, 8vw, 140px); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
         .book-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; }
         .book-shadow-wrapper { position: relative; box-shadow: 0 30px 70px rgba(26,26,46,0.35), 0 10px 26px rgba(26,26,46,0.22), 0 2px 8px rgba(26,26,46,0.18); border-radius: 6px; animation: bookRevealIn 0.45s ease; }
@@ -714,7 +740,7 @@ export default function Page() {
         <a href="/" className="wiz-logo">Story<span>labz</span></a>
         <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
           {!comic && <span className="wiz-step-label">Steg {step} av {totalSteps}</span>}
-          {comic && <button className="pdf-btn" onClick={() => window.print()}>Ladda ner PDF</button>}
+          {comic && <button className="pdf-btn" onClick={handlePrint} disabled={isPreparingPrint}>{isPreparingPrint ? 'Forbereder...' : 'Ladda ner PDF'}</button>}
           <form action={signOut}>
             <button type="submit" className="wiz-logout-btn">Logga ut</button>
           </form>

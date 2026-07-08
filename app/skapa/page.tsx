@@ -595,6 +595,31 @@ export default function Page() {
     setCustomPrompts(prev => ({ ...prev, [panelNumber]: value }));
   };
 
+  // In landscape/spread mode HTMLFlipBook shows two panels side by side, so this
+  // is called once per visible panel index (currentPage and currentPage + 1)
+  // instead of once for a single shared currentPage.
+  const renderRegenField = (panelIndex: number, maxWidth: number) => {
+    const panel = comic?.panels?.[panelIndex];
+    if (!panel || !generatedImages[panel.panel_number]) return null;
+    return (
+      <div className="book-external-regen" style={{ maxWidth, flex: 1, minWidth: 0 }} key={panel.panel_number}>
+        <input
+          type="text"
+          placeholder="Andra nagot i bilden..."
+          value={customPrompts[panel.panel_number] || ''}
+          onChange={(e) => handleRegenChange(panel.panel_number, e.target.value)}
+          disabled={!!panelsLoading[panel.panel_number]}
+        />
+        <button
+          onClick={() => handleRegeneratePanel(panel.panel_number, panel.image_prompt)}
+          disabled={!!panelsLoading[panel.panel_number] || !(customPrompts[panel.panel_number] || '').trim()}
+        >
+          {panelsLoading[panel.panel_number] ? '...' : 'Uppdatera'}
+        </button>
+      </div>
+    );
+  };
+
   const handleFlip = (e: any) => {
     setCurrentPage(e.data);
   };
@@ -744,6 +769,7 @@ export default function Page() {
         .book-page-img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .book-page-placeholder { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
         .book-page-text { width: 100%; background: transparent; border: none; outline: none; resize: none; font-family: Inter, sans-serif; font-size: 0.85rem; line-height: 1.5; color: #1a1a2e; padding: 0.5rem 0.15rem 0.25rem; flex-shrink: 0; }
+        .book-external-regen-row { display: flex; gap: 1rem; width: 100%; justify-content: center; }
         .book-external-regen { display: flex; gap: 0.5rem; width: 100%; }
         .book-external-regen input { flex: 1; min-width: 0; padding: 0.6rem 0.9rem; border: 1.5px solid #e5e0d8; border-radius: 100px; font-size: 0.85rem; outline: none; font-family: Inter, sans-serif; background: white; color: #1a1a2e; }
         .book-external-regen input:focus { border-color: #7c3aed; }
@@ -1121,22 +1147,15 @@ export default function Page() {
               )}
             </div>
 
-            {bookView === 'reading' && comic.panels[currentPage] && generatedImages[comic.panels[currentPage].panel_number] && (
-              <div className="book-external-regen" style={{ maxWidth: bookSize.width }}>
-                <input
-                  type="text"
-                  placeholder="Andra nagot i bilden..."
-                  value={customPrompts[comic.panels[currentPage].panel_number] || ''}
-                  onChange={(e) => handleRegenChange(comic.panels[currentPage].panel_number, e.target.value)}
-                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number]}
-                />
-                <button
-                  onClick={() => handleRegeneratePanel(comic.panels[currentPage].panel_number, comic.panels[currentPage].image_prompt)}
-                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number] || !(customPrompts[comic.panels[currentPage].panel_number] || '').trim()}
-                >
-                  {panelsLoading[comic.panels[currentPage].panel_number] ? '...' : 'Uppdatera'}
-                </button>
-              </div>
+            {bookView === 'reading' && comic.panels[currentPage] && (
+              bookSize.mobile ? (
+                renderRegenField(currentPage, bookSize.width)
+              ) : (
+                <div className="book-external-regen-row" style={{ maxWidth: bookSize.width * 2 }}>
+                  {renderRegenField(currentPage, bookSize.width)}
+                  {renderRegenField(currentPage + 1, bookSize.width)}
+                </div>
+              )
             )}
 
             {bookView === 'cover' && coverImageUrl && (

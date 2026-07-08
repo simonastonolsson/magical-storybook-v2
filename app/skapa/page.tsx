@@ -10,17 +10,20 @@ interface BookPageProps {
   totalPages: number;
   imageUrl: string | undefined;
   isGeneratingThisPanel: boolean;
+  onNarrationChange: (panelNumber: number, value: string) => void;
 }
 
-// The narration textarea and the "Andra nagot i bilden" regenerate field used
-// to live inside this component, but react-pageflip's clickEventForward only
-// whitelists <a> and <button> tags - it calls preventDefault() on mousedown
-// for anything else (including <input>/<textarea>), which silently blocks
-// them from ever getting focus. Both controls now live outside HTMLFlipBook
-// entirely (see .book-external-controls), referencing currentPage instead of
-// being bound to a specific page's JSX.
+// react-pageflip's clickEventForward only whitelists <a> and <button> tags -
+// it calls preventDefault() on mousedown for anything else (including
+// <textarea>), which silently blocks them from ever getting focus. Rather
+// than moving the textarea out of the page (which broke per-page narration
+// in two-page spread mode), we stop the mousedown/touchstart event from
+// bubbling up to page-flip's own listener, which is attached higher up the
+// tree in the bubble phase.
+const stopPageFlipFocusSteal = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
 const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
-  { panel, totalPages, imageUrl, isGeneratingThisPanel },
+  { panel, totalPages, imageUrl, isGeneratingThisPanel, onNarrationChange },
   ref
 ) {
   return (
@@ -35,6 +38,14 @@ const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
           </div>
         )}
       </div>
+      <textarea
+        className="book-page-text"
+        rows={3}
+        value={panel.narration}
+        onChange={(e) => onNarrationChange(panel.panel_number, e.target.value)}
+        onMouseDown={stopPageFlipFocusSteal}
+        onTouchStart={stopPageFlipFocusSteal}
+      />
       <div className="book-page-number">{panel.panel_number} / {totalPages}</div>
     </div>
   );
@@ -733,9 +744,6 @@ export default function Page() {
         .book-page-img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .book-page-placeholder { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
         .book-page-text { width: 100%; background: transparent; border: none; outline: none; resize: none; font-family: Inter, sans-serif; font-size: 0.85rem; line-height: 1.5; color: #1a1a2e; padding: 0.5rem 0.15rem 0.25rem; flex-shrink: 0; }
-        .book-external-controls { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
-        .book-external-narration { width: 100%; background: white; border: 1.5px solid #e5e0d8; border-radius: 12px; padding: 0.75rem 1rem; font-family: Inter, sans-serif; font-size: 0.9rem; line-height: 1.6; color: #1a1a2e; resize: none; outline: none; }
-        .book-external-narration:focus { border-color: #7c3aed; }
         .book-external-regen { display: flex; gap: 0.5rem; width: 100%; }
         .book-external-regen input { flex: 1; min-width: 0; padding: 0.6rem 0.9rem; border: 1.5px solid #e5e0d8; border-radius: 100px; font-size: 0.85rem; outline: none; font-family: Inter, sans-serif; background: white; color: #1a1a2e; }
         .book-external-regen input:focus { border-color: #7c3aed; }
@@ -1086,6 +1094,7 @@ export default function Page() {
                         totalPages={comic.panels.length}
                         imageUrl={generatedImages[panel.panel_number]}
                         isGeneratingThisPanel={currentlyGeneratingPanel === panel.panel_number}
+                        onNarrationChange={handleNarrationChange}
                       />
                     ))}
                   </HTMLFlipBook>
@@ -1112,51 +1121,39 @@ export default function Page() {
               )}
             </div>
 
-            {bookView === 'reading' && comic.panels[currentPage] && (
-              <div className="book-external-controls" style={{ maxWidth: bookSize.width }}>
-                <textarea
-                  className="book-external-narration"
-                  rows={3}
-                  value={comic.panels[currentPage].narration}
-                  onChange={(e) => handleNarrationChange(comic.panels[currentPage].panel_number, e.target.value)}
+            {bookView === 'reading' && comic.panels[currentPage] && generatedImages[comic.panels[currentPage].panel_number] && (
+              <div className="book-external-regen" style={{ maxWidth: bookSize.width }}>
+                <input
+                  type="text"
+                  placeholder="Andra nagot i bilden..."
+                  value={customPrompts[comic.panels[currentPage].panel_number] || ''}
+                  onChange={(e) => handleRegenChange(comic.panels[currentPage].panel_number, e.target.value)}
+                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number]}
                 />
-                {generatedImages[comic.panels[currentPage].panel_number] && (
-                  <div className="book-external-regen">
-                    <input
-                      type="text"
-                      placeholder="Andra nagot i bilden..."
-                      value={customPrompts[comic.panels[currentPage].panel_number] || ''}
-                      onChange={(e) => handleRegenChange(comic.panels[currentPage].panel_number, e.target.value)}
-                      disabled={!!panelsLoading[comic.panels[currentPage].panel_number]}
-                    />
-                    <button
-                      onClick={() => handleRegeneratePanel(comic.panels[currentPage].panel_number, comic.panels[currentPage].image_prompt)}
-                      disabled={!!panelsLoading[comic.panels[currentPage].panel_number] || !(customPrompts[comic.panels[currentPage].panel_number] || '').trim()}
-                    >
-                      {panelsLoading[comic.panels[currentPage].panel_number] ? '...' : 'Uppdatera'}
-                    </button>
-                  </div>
-                )}
+                <button
+                  onClick={() => handleRegeneratePanel(comic.panels[currentPage].panel_number, comic.panels[currentPage].image_prompt)}
+                  disabled={!!panelsLoading[comic.panels[currentPage].panel_number] || !(customPrompts[comic.panels[currentPage].panel_number] || '').trim()}
+                >
+                  {panelsLoading[comic.panels[currentPage].panel_number] ? '...' : 'Uppdatera'}
+                </button>
               </div>
             )}
 
             {bookView === 'cover' && coverImageUrl && (
-              <div className="book-external-controls" style={{ maxWidth: bookSize.mobile ? bookSize.width : bookSize.width * 2 }}>
-                <div className="book-external-regen">
-                  <input
-                    type="text"
-                    placeholder="Andra nagot i bilden..."
-                    value={customPrompts[0] || ''}
-                    onChange={(e) => handleRegenChange(0, e.target.value)}
-                    disabled={!!panelsLoading[0]}
-                  />
-                  <button
-                    onClick={handleRegenerateCover}
-                    disabled={!!panelsLoading[0] || !(customPrompts[0] || '').trim()}
-                  >
-                    {panelsLoading[0] ? '...' : 'Uppdatera'}
-                  </button>
-                </div>
+              <div className="book-external-regen" style={{ maxWidth: bookSize.mobile ? bookSize.width : bookSize.width * 2 }}>
+                <input
+                  type="text"
+                  placeholder="Andra nagot i bilden..."
+                  value={customPrompts[0] || ''}
+                  onChange={(e) => handleRegenChange(0, e.target.value)}
+                  disabled={!!panelsLoading[0]}
+                />
+                <button
+                  onClick={handleRegenerateCover}
+                  disabled={!!panelsLoading[0] || !(customPrompts[0] || '').trim()}
+                >
+                  {panelsLoading[0] ? '...' : 'Uppdatera'}
+                </button>
               </div>
             )}
           </div>

@@ -67,17 +67,19 @@ interface BookCoverProps {
   title: string;
   imageUrl?: string | null;
   isGenerating?: boolean;
+  onImageLoad?: () => void;
+  onImageError?: () => void;
 }
 
 // Rendered standalone (outside HTMLFlipBook) so the cover/back cover can take
 // up the full spread width as one page, instead of react-pageflip's hard-page
 // mode, which still reserves a 2-page-wide slot and leaves the other half empty.
-function BookCoverPage({ variant, title, imageUrl, isGenerating }: BookCoverProps) {
+function BookCoverPage({ variant, title, imageUrl, isGenerating, onImageLoad, onImageError }: BookCoverProps) {
   if (variant === 'front') {
     return (
       <div className="book-page book-cover book-cover-front">
         {imageUrl ? (
-          <img src={imageUrl} alt="" className="book-cover-img" />
+          <img src={imageUrl} alt="" className="book-cover-img" onLoad={onImageLoad} onError={onImageError} />
         ) : isGenerating ? (
           <div className="book-cover-placeholder">
             <span style={{fontSize:'2rem'}}>🎨</span>
@@ -599,6 +601,18 @@ export default function Page() {
       await Promise.all(urls.map(preloadImage));
     } finally {
       setIsPreparingPrint(false);
+
+      // TEMPORARY DIAGNOSTIC LOGGING - remove once the print cover-image bug is confirmed fixed or root-caused.
+      const printCoverImg = document.querySelector<HTMLImageElement>('.print-only .book-cover-front .book-cover-img');
+      console.log('[PRINT DEBUG] coverImageUrl state right before window.print():', coverImageUrl);
+      console.log('[PRINT DEBUG] print-only cover <img> element found in DOM:', !!printCoverImg);
+      if (printCoverImg) {
+        console.log('[PRINT DEBUG] print-only cover <img>.src:', printCoverImg.src);
+        console.log('[PRINT DEBUG] print-only cover <img>.complete:', printCoverImg.complete);
+        console.log('[PRINT DEBUG] print-only cover <img>.naturalWidth:', printCoverImg.naturalWidth);
+        console.log('[PRINT DEBUG] print-only cover <img>.naturalHeight:', printCoverImg.naturalHeight);
+      }
+
       window.print();
     }
   };
@@ -1051,7 +1065,13 @@ export default function Page() {
           {/* Full book, one page per printed sheet, only rendered for PDF/print export */}
           <div className="print-only">
             <div className="print-page print-page-cover">
-              <BookCoverPage variant="front" title={comic.title} imageUrl={coverImageUrl} />
+              <BookCoverPage
+                variant="front"
+                title={comic.title}
+                imageUrl={coverImageUrl}
+                onImageLoad={() => console.log('[PRINT DEBUG] print-only cover <img> onLoad fired, src=', coverImageUrl)}
+                onImageError={() => console.error('[PRINT DEBUG] print-only cover <img> onError fired, src=', coverImageUrl)}
+              />
             </div>
             {comic.panels.map((panel: any) => renderPrintPage(panel))}
             <div className="print-page print-page-cover">

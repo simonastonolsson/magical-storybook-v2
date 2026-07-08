@@ -8,43 +8,43 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     positive: "digital painted illustration, painterly art style, soft brush strokes, natural volumetric lighting, cinematic composition, detailed background environment, high quality digital painting, concept art, story illustration",
     negative: "photograph, photorealistic, DSLR, 3D CGI, Pixar, anime, chibi, flat colors, hard outlines, duplicates",
     qualityBoost: ", cinematic dramatic lighting, rich composition, vivid saturated colors, high quality detailed illustration",
-    loraScale: 0.83,
-    loraScaleChild: 0.91
+    loraScale: 0.80,
+    loraScaleChild: 0.88
   },
   ligne_claire: {
     positive: "ligne claire comic art style, clean precise ink outlines, flat cel colors, bright even lighting, clear readable panels, European bande dessinee style, Tintin inspired illustration, bold outlines, simple clean backgrounds",
     negative: "photograph, photorealistic, 3D CGI, anime, shading, dark shadows, watercolor, rough textures, duplicates",
     qualityBoost: ", rich detailed composition, vivid bold flat colors, high quality clean illustration",
-    loraScale: 0.81,
-    loraScaleChild: 0.88
+    loraScale: 0.78,
+    loraScaleChild: 0.85
   },
   american_comic: {
     positive: "American superhero comic book art, bold ink outlines, dynamic composition, strong contrasting colors, Marvel DC style illustration, halftone dots, dramatic lighting, action comic panel, professional comic art",
     negative: "photograph, photorealistic, 3D CGI, anime, watercolor, soft colors, duplicates, blurry",
     qualityBoost: ", cinematic dramatic lighting, rich dynamic composition, vivid saturated colors, high quality detailed illustration",
-    loraScale: 0.81,
-    loraScaleChild: 0.88
+    loraScale: 0.78,
+    loraScaleChild: 0.85
   },
   watercolor: {
     positive: "cozy heartwarming 2D hand-drawn watercolor storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
     negative: "photograph, photorealistic, 3D CGI, Pixar, anime, chibi, hard outlines, flat digital colors, duplicates",
     qualityBoost: ", rich detailed composition, luminous glowing colors, high quality detailed illustration",
-    loraScale: 0.88,
-    loraScaleChild: 0.93
+    loraScale: 0.85,
+    loraScaleChild: 0.90
   },
   noir: {
     positive: "black and white noir comic illustration, high contrast ink drawing, dramatic shadows, cross-hatching technique, graphic novel art style, Sin City inspired, expressive ink lines, moody atmosphere, detailed pen and ink illustration",
     negative: "color, photograph, photorealistic, 3D CGI, anime, watercolor, pastel colors, duplicates",
     qualityBoost: ", dramatic high-contrast lighting, rich detailed composition, high quality detailed illustration",
-    loraScale: 0.81,
-    loraScaleChild: 0.88
+    loraScale: 0.78,
+    loraScaleChild: 0.85
   },
   pop_art: {
     positive: "Roy Lichtenstein pop art comic style, bold black outlines, Ben-Day dots pattern, primary flat colors, retro comic book illustration, speech bubbles style, graphic pop art panel, strong graphic design aesthetic",
     negative: "photograph, photorealistic, 3D CGI, anime, soft colors, watercolor, realistic shading, duplicates",
     qualityBoost: ", bold dynamic composition, vivid saturated colors, high quality detailed illustration",
-    loraScale: 0.78,
-    loraScaleChild: 0.85
+    loraScale: 0.75,
+    loraScaleChild: 0.82
   }
 };
 

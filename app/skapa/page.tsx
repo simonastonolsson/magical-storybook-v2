@@ -124,23 +124,6 @@ function computeBookSize() {
   return { width: Math.round(width), height: Math.round(height), mobile };
 }
 
-// Panel image_prompts carry their own camera/shot-type instructions (from
-// app/api/story/route.ts's system prompt), which compete with the cover's own
-// dynamic close-up framing, and repeat the character's charDesc (already sent
-// separately as its own field). Strip both so only scene/setting/action
-// content comes through, regardless of the character's actual age or gender.
-function extractSceneHint(imagePrompt: string, charDesc?: string): string {
-  let scene = imagePrompt || '';
-  scene = scene.replace(/^Comic book panel illustration,\s*graphic novel art,\s*/i, '');
-  scene = scene.replace(/\b(wide[- ]angle|shot from a distance|establishing shot|action shot|three-quarter (body |face )?(shot|view)|looking away from the camera|with substantial empty headroom[^,]*|drawing of)\b,?/gi, '');
-  if (charDesc) {
-    const escapedDesc = charDesc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    scene = scene.replace(new RegExp(escapedDesc, 'gi'), '');
-  }
-  scene = scene.replace(/,\s*,/g, ',').replace(/\s{2,}/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '');
-  return scene;
-}
-
 export default function Page() {
   const [step, setStep] = useState(1);
   const [memory, setMemory] = useState('');
@@ -395,9 +378,7 @@ export default function Page() {
   const generateCoverImage = async (comicData: any) => {
     setIsGeneratingCover(true);
     try {
-      const heroPanel = comicData.panels[0];
-      const sceneHint = extractSceneHint(heroPanel?.image_prompt, charDesc);
-      const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + comicData.title + "', small-scale background elements hinting at the plot: " + sceneHint + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+      const coverPrompt = "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " in a dynamic heroic action pose, mid-motion, dramatic angle, waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + comicData.title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

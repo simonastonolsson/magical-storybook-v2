@@ -440,8 +440,13 @@ export default function Page() {
     setIsGeneratingImages(false);
   };
 
+  // Experiment J: the trigger word is added separately (once) as the "Main
+  // subject:" prefix in generate-image/route.ts's finalPrompt construction -
+  // it must not also appear here, or the model sees it twice in one prompt,
+  // which the story prompt's own CLONE PREVENTION rule warns causes duplicate
+  // characters to be drawn.
   const buildCoverPrompt = (title: string, coverScene: string) =>
-    "Comic book cover art, dramatic graphic novel cover illustration, " + charTrigger + " " + (coverScene || "in a dynamic heroic action pose, mid-motion, dramatic angle") + ", waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+    "Comic book cover art, dramatic graphic novel cover illustration, the character " + (coverScene || "in a dynamic heroic action pose, mid-motion, dramatic angle") + ", waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
 
   const generateCoverImage = async (comicData: any, baseSeed: number) => {
     setIsGeneratingCover(true);

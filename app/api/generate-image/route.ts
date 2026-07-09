@@ -178,7 +178,12 @@ export async function POST(request: Request) {
     const sceneHasIntenseLighting = intenseLightingKeywords.test(cleanedPrompt);
     const qualityBoost = sceneHasIntenseLighting ? style.qualityBoostNoLighting : style.qualityBoost;
 
-    const finalPrompt = "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + style.styleConsistency;
+    // Experiment J: trigger word + core identity moved to the very front of the
+    // prompt (previously buried after the framing sentence and the entire
+    // style.positive block) - some models weight earlier tokens more heavily,
+    // so this keeps the LoRA identity anchor from being diluted by a long
+    // preamble. Same fragments as before, only reordered.
+    const finalPrompt = "Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. " + "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + style.styleConsistency;
 
     // Experiment B: extraLoraId is only ever set when the companion's trigger
     // word is actually present in this prompt (see companionLoraIdForPrompt in

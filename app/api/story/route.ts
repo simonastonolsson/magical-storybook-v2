@@ -85,7 +85,21 @@ export async function POST(req: Request) {
          - This rule applies independently of any other consistency rule in this
            list - it exists purely to give the illustration a concrete visual
            anchor to tell the two characters apart.
-      9. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
+      9. STYLE-NEUTRAL COMPANION DESCRIPTION (STRICT CONSISTENCY RULE - keeps the whole
+         book's art style consistent regardless of who is in the scene):
+         - You may freely describe the companion's species, color, size, and shape in
+           the image_prompt (e.g. "a friendly green dinosaur with a long neck and
+           small arms").
+         - You must NEVER use words that describe an ART STYLE or rendering technique
+           for the companion or anything else in the scene - e.g. "cartoon-style",
+           "cartoon", "animated", "vintage hand-drawn", "3D", "Pixar-style", or
+           similar. The entire book's art style is already fixed separately and
+           applied uniformly to every panel, regardless of which characters appear in
+           that scene - it must never be re-described, overridden, or contradicted in
+           the image_prompt itself.
+         - Example: write "a friendly green dinosaur with a long neck and small arms",
+           NOT "a friendly green cartoon-style dinosaur".
+      10. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
          - Write a "cover_scene": exactly ONE sentence, in ENGLISH, describing a specific,
            iconic moment or pose that is genuinely representative of the story you just
            wrote in the panels array above - not a generic, unrelated action pose.

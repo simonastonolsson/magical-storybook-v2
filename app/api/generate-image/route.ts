@@ -138,8 +138,15 @@ export async function POST(request: Request) {
       ? ", character's exact childlike facial features and proportions preserved, do not age up"
       : ", character's exact facial features, bone structure and apparent age preserved from reference photos, do not age down or age up";
 
-    const multiPersonKeywords = /\b(crowd|group of|several people|many people|bystanders|classmates|audience|onlookers|other (people|kids|children|students)|companions|surrounded by)\b/i;
-    const backgroundDiversity = multiPersonKeywords.test(cleanedPrompt)
+    // Widened after a confirmed miss: a hockey scene ("teammates", "other
+    // players", "spectators", "stands") matched none of the original narrow
+    // list, so the scene was wrongly classified as solo and got the
+    // experiment-B lora_scale boost, leaking the main character's face onto
+    // background teammates/spectators. Deliberately broad - better to miss a
+    // boost opportunity than to risk leakage again.
+    const multiPersonKeywords = /\b(crowd|crowds|spectator|spectators|audience|bystanders|onlookers|classmates|teammates|team-mates|team mates|players|other players|opposing team|opponents|skaters|other skaters|athletes|competitors|racers|dancers|singers|passengers|customers|guests|coworkers|colleagues|siblings|friends|family members|fans|cheering|stands|bleachers|stadium|arena|rink full of|group of|groups of|several people|many people|lots of people|dozens of|hundreds of|everyone|everybody|whole team|entire team|full team|packed (stands|arena|rink)|other (people|kids|children|students|players|skaters|athletes|teammates|racers|dancers|competitors)|companions|surrounded by|background characters|watching crowd|people watching)\b/i;
+    const hasMultiplePeople = multiPersonKeywords.test(cleanedPrompt);
+    const backgroundDiversity = hasMultiplePeople
       ? ", background characters have diverse and varied faces, different from the protagonist, unrelated bystanders with distinct individual appearances"
       : "";
 
@@ -154,12 +161,12 @@ export async function POST(request: Request) {
     // keywords means this specific scene depicts the main character alone -
     // the only case where a higher lora_scale carries no leakage risk to
     // other people in frame.
-    const soloSceneBoostApplied = !extraLoraId && !multiPersonKeywords.test(cleanedPrompt);
+    const soloSceneBoostApplied = !extraLoraId && !hasMultiplePeople;
     const activeLoraScale = soloSceneBoostApplied
       ? (isChild ? style.loraScaleSoloChild : style.loraScaleSolo)
       : (isChild ? style.loraScaleChild : style.loraScale);
 
-    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
+    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,

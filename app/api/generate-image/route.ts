@@ -126,16 +126,17 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
+    // Experiment J follow-up: "Main subject: " + characterAnchor (added below)
+    // is now the sole intended mention of the trigger word in the whole
+    // finalPrompt. Any occurrence still inside cleanedPrompt (Gemini's own
+    // image_prompt, which CLONE PREVENTION requires to contain it exactly
+    // once) is now a second, redundant mention - previously adjacent to the
+    // "Main subject:" one, now separated from it by the framing sentence and
+    // the entire style.positive block after the reordering. Strip every
+    // occurrence here, not just extras beyond the first.
     if (triggerWord) {
       const triggerRegex = new RegExp(triggerWord, 'gi');
-      const matches = cleanedPrompt.match(triggerRegex) || [];
-      if (matches.length > 1) {
-        let count = 0;
-        cleanedPrompt = cleanedPrompt.replace(triggerRegex, (match: string) => {
-          count++;
-          return count === 1 ? match : "the character";
-        });
-      }
+      cleanedPrompt = cleanedPrompt.replace(triggerRegex, "the character");
     }
 
     if (cleanedPrompt.toLowerCase().includes("car")) {

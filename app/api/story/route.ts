@@ -67,7 +67,25 @@ export async function POST(req: Request) {
          - The character's appearance is fixed as exactly "${desc}" for the ENTIRE story, in every single panel, with zero exceptions.
          - Do not age the character up or down, do not change their gender, species, or any physical trait, and do not alter this description based on the scene, activity, time of day, or mood - a panel showing them asleep, playing, or in danger must still describe them as exactly "${desc}".
          - This rule applies identically no matter what "${desc}" actually is - whether it describes a child, an adult, or an animal. Never substitute your own assumption about age or appearance for what is explicitly given here.
-      8. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
+      8. SECONDARY CHARACTER DISTINCTNESS (STRICT CONSISTENCY RULE - prevents visual
+         confusion with the main character):
+         - Whenever a secondary character (someone who is NOT the main character and
+           NOT the named companion, if any) has close physical interaction or direct
+           eye contact with the main character in a scene - e.g. handing them an
+           object, sitting right next to them, looking straight at them, shaking
+           their hand - and is not just visible in the background, you MUST give
+           that secondary character a clear, concrete DIFFERENT appearance in that
+           panel's image_prompt.
+         - Specify at least one of: different hair color, different skin tone,
+           different body type/age, or different gender than the main character.
+         - Write it as ordinary descriptive text woven into the scene, e.g. "a
+           curly-haired blonde classmate leaning over the desk" - NEVER as a
+           generic placeholder like "a different looking person" or "someone who
+           looks different".
+         - This rule applies independently of any other consistency rule in this
+           list - it exists purely to give the illustration a concrete visual
+           anchor to tell the two characters apart.
+      9. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
          - Write a "cover_scene": exactly ONE sentence, in ENGLISH, describing a specific,
            iconic moment or pose that is genuinely representative of the story you just
            wrote in the panels array above - not a generic, unrelated action pose.

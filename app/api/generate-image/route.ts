@@ -150,6 +150,19 @@ export async function POST(request: Request) {
       ? ", background characters have diverse and varied faces, different from the protagonist, unrelated bystanders with distinct individual appearances"
       : "";
 
+    // Experiment F: multiPersonKeywords targets crowds/groups, but a single
+    // named secondary character in close interaction with the main character
+    // (e.g. "the student receiving the book") matched none of those group
+    // words, so such scenes still got the solo lora_scale boost and leaked
+    // the main character's face onto that one other person. Separate,
+    // deliberately broad check for ANY other human role mentioned, singular
+    // or plural - independent of multiPersonKeywords/backgroundDiversity so
+    // neither one's future changes affect the other. Known limitation: this
+    // is keyword matching, not language understanding, so a pronoun-only
+    // reference ("he handed her a gift") with no role noun isn't caught.
+    const secondaryPersonKeywords = /\b(student|classmate|colleague|coworker|co-worker|teammate|friend|sibling|neighbor|neighbour|stranger|passerby|passer-by|visitor|guest|customer|client|patient|admirer|rival|opponent|librarian|teacher|doctor|nurse|waiter|waitress|cashier|driver|pedestrian|boy|girl|man|woman|kid|child|person|someone|figure|individual)\b/i;
+    const hasSecondaryPerson = secondaryPersonKeywords.test(cleanedPrompt);
+
     const sceneHasIntenseLighting = intenseLightingKeywords.test(cleanedPrompt);
     const qualityBoost = sceneHasIntenseLighting ? style.qualityBoostNoLighting : style.qualityBoost;
 
@@ -161,12 +174,12 @@ export async function POST(request: Request) {
     // keywords means this specific scene depicts the main character alone -
     // the only case where a higher lora_scale carries no leakage risk to
     // other people in frame.
-    const soloSceneBoostApplied = !extraLoraId && !hasMultiplePeople;
+    const soloSceneBoostApplied = !extraLoraId && !hasMultiplePeople && !hasSecondaryPerson;
     const activeLoraScale = soloSceneBoostApplied
       ? (isChild ? style.loraScaleSoloChild : style.loraScaleSolo)
       : (isChild ? style.loraScaleChild : style.loraScale);
 
-    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
+    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,

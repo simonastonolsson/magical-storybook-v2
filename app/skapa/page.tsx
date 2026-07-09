@@ -201,6 +201,16 @@ export default function Page() {
     }
   };
 
+  const handleTrainNewCharacterKeepExisting = () => {
+    setSavedModelDbId(null);
+    setTrainedModelId(null);
+    setReferenceImageUrl(null);
+    setCharacterName('');
+    setCharacterDescription('an adult man');
+    setTrainingStatus('');
+    setSelectedFiles([]);
+  };
+
   useEffect(() => {
     const loadSavedModels = async () => {
       try {
@@ -997,6 +1007,11 @@ export default function Page() {
                 )}
                 {trainingStatus && (
                   <div className={'wiz-status' + (trainedModelId ? ' wiz-success' : '')}>{trainingStatus}</div>
+                )}
+                {trainedModelId && (
+                  <button className="wiz-upload-btn" onClick={handleTrainNewCharacterKeepExisting}>
+                    + Trana en helt ny karaktar (behall {charName})
+                  </button>
                 )}
                 {trainedModelId && (
                   <button className="wiz-delete-link" onClick={() => {

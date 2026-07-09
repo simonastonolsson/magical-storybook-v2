@@ -31,7 +31,7 @@ export async function POST(req: Request) {
                     desc.toLowerCase().includes("baby");
 
     const signatureOutfit = isChild
-      ? "wearing his signature cozy yellow storybook raincoat and blue denim jeans"
+      ? "wearing his signature cozy yellow raincoat and blue denim jeans"
       : "wearing his signature classic navy blue sweater and dark grey trousers";
 
     const companionInstruction = secondaryName && secondaryTrigger && secondaryTriggerWord

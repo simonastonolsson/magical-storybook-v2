@@ -108,9 +108,9 @@ export default function Home() {
 
       <section className="hero">
         <div className="hero-bg"></div>
-        <div className="hero-badge">AI-genererade personliga bocker</div>
+        <div className="hero-badge">AI-genererade personliga böcker</div>
         <h1>Din story.<br /><em>Ditt ansikte.</em><br />Din bok.</h1>
-        <p>Ladda upp nagra foton - AI:n skapar en personlig seriebok med dig som stjarna. Perfekt present eller minnessak du aldrig glommar.</p>
+        <p>Ladda upp några foton - AI:n skapar en personlig seriebok med dig som stjärna. Perfekt present eller minnessak du aldrig glömmer.</p>
         <div className="hero-actions">
           <Link href="/skapa" className="btn-primary">Skapa din bok - 299 kr</Link>
           <a href="#how" className="btn-secondary">Hur fungerar det?</a>

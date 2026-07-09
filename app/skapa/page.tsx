@@ -35,7 +35,7 @@ const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
         ) : (
           <div className="book-page-placeholder">
             <span style={{fontSize:'2rem'}}>{isGeneratingThisPanel ? '🎨' : '⏳'}</span>
-            <span style={{fontSize:'0.8rem', color:'#9ca3af'}}>{isGeneratingThisPanel ? 'Ritar...' : 'Vantar...'}</span>
+            <span style={{fontSize:'0.8rem', color:'#9ca3af'}}>{isGeneratingThisPanel ? 'Ritar...' : 'Väntar...'}</span>
           </div>
         )}
       </div>
@@ -232,7 +232,7 @@ export default function Page() {
     const savedCompanion = localStorage.getItem('my_saved_companion_lora_model');
     if (savedCompanion && savedCompanion.includes('/')) {
       setCompanionModelId(savedCompanion);
-      setCompanionTrainingStatus('Sparad AI for kompisen hittad!');
+      setCompanionTrainingStatus('Sparad AI för kompisen hittad!');
     }
     const savedOutfit = localStorage.getItem('my_saved_outfit');
     if (savedOutfit) setCharOutfit(savedOutfit);
@@ -310,7 +310,7 @@ export default function Page() {
     const uploadRes = await fetch('/api/upload-training-data', { method: 'POST', body: formData });
     if (!uploadRes.ok) throw new Error('Upload failed');
     const { url: rawZipUrl } = await uploadRes.json();
-    onStatusChange('Startar AI-traning... (5-10 min)');
+    onStatusChange('Startar AI-träning... (5-10 min)');
     const trainRes = await fetch('/api/train-model', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -319,14 +319,14 @@ export default function Page() {
     if (!trainRes.ok) throw new Error('Training failed to start');
     const { trainingId } = await trainRes.json();
     return new Promise((resolve, reject) => {
-      onStatusChange('AI:n tranas... Stang inte sidan.');
+      onStatusChange('AI:n tränas... Stäng inte sidan.');
       const checkInterval = setInterval(async () => {
         try {
           const checkRes = await fetch('/api/check-training?id=' + trainingId);
           const checkData = await checkRes.json();
           if (checkData.status === 'succeeded') { clearInterval(checkInterval); resolve(checkData.fullPath); }
           else if (checkData.status === 'failed' || checkData.status === 'canceled') { clearInterval(checkInterval); reject(new Error('Training failed')); }
-          else { onStatusChange('Tranar... (' + checkData.status + ')'); }
+          else { onStatusChange('Tränar... (' + checkData.status + ')'); }
         } catch (err) { clearInterval(checkInterval); reject(err); }
       }, 15000);
     });
@@ -346,14 +346,14 @@ export default function Page() {
       setReferenceImageUrl(refUrl);
       const path = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger);
       setTrainedModelId(path);
-      setTrainingStatus('Sparar din AI-karaktar...');
+      setTrainingStatus('Sparar din AI-karaktär...');
       try {
         const saveRes = await fetch('/api/user-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model_path: path,
-            model_name: charName || 'Min karaktar',
+            model_name: charName || 'Min karaktär',
             trigger_word: charTrigger,
             char_desc: charDesc,
             reference_image_url: refUrl,
@@ -370,10 +370,10 @@ export default function Page() {
       } catch (saveErr) {
         console.error('Failed to save model to account', saveErr);
       }
-      setTrainingStatus('Klart! Din AI-karaktar ar redo.');
+      setTrainingStatus('Klart! Din AI-karaktär är redo.');
     } catch (err) {
       console.error(err);
-      setTrainingStatus('Fel vid traning. Forsok igen.');
+      setTrainingStatus('Fel vid träning. Försök igen.');
     } finally { setIsTraining(false); }
   };
 
@@ -388,7 +388,7 @@ export default function Page() {
       setCompanionTrainingStatus('Klart!');
     } catch (err) {
       console.error(err);
-      setCompanionTrainingStatus('Traning misslyckades.');
+      setCompanionTrainingStatus('Träning misslyckades.');
     } finally { setIsTrainingCompanion(false); }
   };
 
@@ -476,7 +476,7 @@ export default function Page() {
   };
 
   const handleCreateStory = async () => {
-    if (!memory.trim()) { alert("Beskriv ett aventyr forst!"); return; }
+    if (!memory.trim()) { alert("Beskriv ett äventyr först!"); return; }
     setIsLoadingScript(true);
     setComic(null);
     setCurrentPage(0);
@@ -518,7 +518,7 @@ export default function Page() {
       generateImagesForComic(data.comic, baseSeed);
     } catch (err) {
       console.error(err);
-      alert("Nagot gick snett, forsok igen.");
+      alert("Något gick snett, försök igen.");
     } finally { setIsLoadingScript(false); }
   };
 
@@ -617,8 +617,8 @@ export default function Page() {
 
   const childOutfits = [
     { value: 'jeans and a cozy sweater, round neckline', label: 'Vardaglig', emoji: '👕' },
-    { value: 'superhero cape and mask, colorful costume', label: 'Superhjalte', emoji: '🦸' },
-    { value: 'khaki cargo pants and adventure jacket', label: 'Aventyrare', emoji: '🎒' },
+    { value: 'superhero cape and mask, colorful costume', label: 'Superhjälte', emoji: '🦸' },
+    { value: 'khaki cargo pants and adventure jacket', label: 'Äventyrare', emoji: '🎒' },
     { value: 'cozy pajamas with star pattern', label: 'Pyjamas', emoji: '🌙' },
   ];
 
@@ -658,7 +658,7 @@ export default function Page() {
       <div className="book-external-regen" style={{ maxWidth, flex: 1, minWidth: 0 }} key={panel.panel_number}>
         <input
           type="text"
-          placeholder="Andra nagot i bilden..."
+          placeholder="Ändra något i bilden..."
           value={customPrompts[panel.panel_number] || ''}
           onChange={(e) => handleRegenChange(panel.panel_number, e.target.value)}
           disabled={!!panelsLoading[panel.panel_number]}
@@ -879,7 +879,7 @@ export default function Page() {
         <a href="/" className="wiz-logo">Story<span>labz</span></a>
         <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
           {!comic && <span className="wiz-step-label">Steg {step} av {totalSteps}</span>}
-          {comic && <button className="pdf-btn" onClick={handlePrint} disabled={isPreparingPrint}>{isPreparingPrint ? 'Forbereder...' : 'Ladda ner PDF'}</button>}
+          {comic && <button className="pdf-btn" onClick={handlePrint} disabled={isPreparingPrint}>{isPreparingPrint ? 'Förbereder...' : 'Ladda ner PDF'}</button>}
           <form action={signOut}>
             <button type="submit" className="wiz-logout-btn">Logga ut</button>
           </form>
@@ -898,13 +898,13 @@ export default function Page() {
           {step === 1 && (
             <>
               <div className="wiz-eyebrow">Steg 1 av 4</div>
-              <div className="wiz-title">Vem ar stjarnan?</div>
-              <p className="wiz-sub">Beratta vem boken ska handla om och ladda upp foton sa att AI:n kan skapa din unika karaktar.</p>
+              <div className="wiz-title">Vem är stjärnan?</div>
+              <p className="wiz-sub">Berätta vem boken ska handla om och ladda upp foton så att AI:n kan skapa din unika karaktär.</p>
 
               {showCharacterPicker && !trainedModelId && (
                 <div className="wiz-card">
-                  <label className="wiz-label">Valj karaktar</label>
-                  <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Du har flera sparade karaktarer - valj en att anvanda, eller trana en ny.</p>
+                  <label className="wiz-label">Välj karaktär</label>
+                  <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Du har flera sparade karaktärer - välj en att använda, eller träna en ny.</p>
                   <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
                     {savedCharacters.map((m) => (
                       <div key={m.id} style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.9rem', border:'1.5px solid #e5e0d8', borderRadius:'12px'}}>
@@ -912,13 +912,13 @@ export default function Page() {
                           <img src={m.reference_image_url} alt={m.model_name} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover'}} />
                         )}
                         <span style={{flex:1, fontWeight:600}}>{m.model_name}</span>
-                        <button className="wiz-chip" onClick={() => selectCharacter(m)}>Valj</button>
+                        <button className="wiz-chip" onClick={() => selectCharacter(m)}>Välj</button>
                         <button className="wiz-delete-link" onClick={() => handleDeleteCharacter(m.id)}>Ta bort</button>
                       </div>
                     ))}
                   </div>
                   <button className="wiz-upload-btn" style={{marginTop:'1rem'}} onClick={() => setShowCharacterPicker(false)}>
-                    + Trana en ny karaktar istallet
+                    + Träna en ny karaktär istället
                   </button>
                 </div>
               )}
@@ -932,7 +932,7 @@ export default function Page() {
                     <input className="wiz-input" type="text" placeholder="t.ex. Simon" value={charName} onChange={(e) => setCharacterName(e.target.value)} />
                   </div>
                   <div>
-                    <label className="wiz-label">Karaktarstyp</label>
+                    <label className="wiz-label">Karaktärstyp</label>
                     <select className="wiz-select" value={charDesc} onChange={(e) => handleCharDescChange(e.target.value)}>
                       <option value="an adult man">Vuxen man</option>
                       <option value="an adult woman">Vuxen kvinna</option>
@@ -943,7 +943,7 @@ export default function Page() {
                     </select>
                     {charDescSaveStatus === 'saving' && <span style={{fontSize:'0.75rem', color:'#6b7280', marginTop:'0.35rem', display:'block'}}>Sparar...</span>}
                     {charDescSaveStatus === 'saved' && <span style={{fontSize:'0.75rem', color:'#065f46', marginTop:'0.35rem', display:'block'}}>Sparat!</span>}
-                    {charDescSaveStatus === 'error' && <span style={{fontSize:'0.75rem', color:'#ef4444', marginTop:'0.35rem', display:'block'}}>Kunde inte spara, forsok igen</span>}
+                    {charDescSaveStatus === 'error' && <span style={{fontSize:'0.75rem', color:'#ef4444', marginTop:'0.35rem', display:'block'}}>Kunde inte spara, försök igen</span>}
                   </div>
                 </div>
 
@@ -992,17 +992,17 @@ export default function Page() {
 
               <div className="wiz-card">
                 <label className="wiz-label">Foton (minst 5)</label>
-                <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Ladda upp selfies eller portrattbilder dar ansiktet syns tydligt. Fler bilder = battre likhet.</p>
+                <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Ladda upp selfies eller porträttbilder där ansiktet syns tydligt. Fler bilder = bättre likhet.</p>
                 <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" style={{display:'none'}} />
                 <div style={{display:'flex', alignItems:'center', gap:'1rem', flexWrap:'wrap'}}>
                   <button className="wiz-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null}>
-                    📸 Valj foton
+                    📸 Välj foton
                   </button>
                   {selectedFiles.length > 0 && <span style={{fontSize:'0.85rem', color:'#6b7280'}}>{selectedFiles.length} foton valda</span>}
                 </div>
                 {selectedFiles.length >= 5 && !trainedModelId && (
                   <button className="wiz-train-btn" onClick={handleStartTraining} disabled={isTraining}>
-                    {isTraining ? 'Tranar...' : 'Starta AI-traning'}
+                    {isTraining ? 'Tränar...' : 'Starta AI-träning'}
                   </button>
                 )}
                 {trainingStatus && (
@@ -1010,7 +1010,7 @@ export default function Page() {
                 )}
                 {trainedModelId && (
                   <button className="wiz-upload-btn" onClick={handleTrainNewCharacterKeepExisting}>
-                    + Trana en helt ny karaktar (behall {charName})
+                    + Träna en helt ny karaktär (behåll {charName})
                   </button>
                 )}
                 {trainedModelId && (
@@ -1023,7 +1023,7 @@ export default function Page() {
                       setTrainingStatus('');
                     }
                   }}>
-                    Ta bort och trana ny karaktar
+                    Ta bort och träna ny karaktär
                   </button>
                 )}
               </div>
@@ -1035,11 +1035,11 @@ export default function Page() {
           {step === 2 && (
             <>
               <div className="wiz-eyebrow">Steg 2 av 4</div>
-              <div className="wiz-title">Ska nagon flja med?</div>
-              <p className="wiz-sub">Lagg till en kompis, ett husdjur eller ga ensam pa aventyret.</p>
+              <div className="wiz-title">Ska någon följa med?</div>
+              <p className="wiz-sub">Lägg till en kompis, ett husdjur eller gå ensam på äventyret.</p>
 
               <div className="wiz-card">
-                <label className="wiz-label">Foljslagare</label>
+                <label className="wiz-label">Följeslagare</label>
                 <div className="wiz-chips" style={{marginBottom:'1rem'}}>
                   {[{type:'none',label:'Ingen',emoji:'🧍'},{type:'dog',label:'Hund',emoji:'🐶'},{type:'cat',label:'Katt',emoji:'🐱'},{type:'friend',label:'Kompis',emoji:'🧑'}].map((opt) => (
                     <button key={opt.type} onClick={() => { setCompanionType(opt.type as any); if (opt.type !== 'friend') setUseCustomCompanionAI(false); if (opt.type === 'none') setCompanionName(''); }} className={'wiz-chip' + (companionType === opt.type ? ' active' : '')}>
@@ -1050,7 +1050,7 @@ export default function Page() {
 
                 {companionType !== 'none' && (
                   <div style={{marginTop:'0.5rem'}}>
-                    <label className="wiz-label">Namn pa {companionType === 'dog' ? 'hunden' : companionType === 'cat' ? 'katten' : 'kompisen'}</label>
+                    <label className="wiz-label">Namn på {companionType === 'dog' ? 'hunden' : companionType === 'cat' ? 'katten' : 'kompisen'}</label>
                     <input className="wiz-input" type="text" placeholder="t.ex. Aston" value={companionName} onChange={(e) => setCompanionName(e.target.value)} />
                   </div>
                 )}
@@ -1059,17 +1059,17 @@ export default function Page() {
                   <div style={{marginTop:'1rem', paddingTop:'1rem', borderTop:'1px solid #f3f0eb'}}>
                     <label style={{display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer', fontSize:'0.9rem', fontWeight:'600'}}>
                       <input type="checkbox" checked={useCustomCompanionAI} onChange={(e) => setUseCustomCompanionAI(e.target.checked)} />
-                      Trana AI pa {companionName || "kompisen"}s utseende
+                      Träna AI på {companionName || "kompisen"}s utseende
                     </label>
                     {useCustomCompanionAI && (
                       <div style={{marginTop:'0.75rem'}}>
                         <input type="file" multiple ref={companionFileInputRef} onChange={handleCompanionFileSelection} className="hidden" accept="image/*" style={{display:'none'}} />
                         <button className="wiz-upload-btn" onClick={() => companionFileInputRef.current?.click()} disabled={isTrainingCompanion || companionModelId !== null} style={{fontSize:'0.85rem'}}>
-                          Valj foton pa {companionName || "kompisen"}
+                          Välj foton på {companionName || "kompisen"}
                         </button>
                         {companionFiles.length >= 5 && !companionModelId && (
                           <button className="wiz-train-btn" onClick={handleStartCompanionTraining} disabled={isTrainingCompanion} style={{fontSize:'0.9rem'}}>
-                            {isTrainingCompanion ? 'Tranar...' : 'Starta traning'}
+                            {isTrainingCompanion ? 'Tränar...' : 'Starta träning'}
                           </button>
                         )}
                         {companionTrainingStatus && <div className={'wiz-status' + (companionModelId ? ' wiz-success' : '')}>{companionTrainingStatus}</div>}
@@ -1084,11 +1084,11 @@ export default function Page() {
           {step === 3 && (
             <>
               <div className="wiz-eyebrow">Steg 3 av 4</div>
-              <div className="wiz-title">Vad ska handa?</div>
-              <p className="wiz-sub">Beskriv aventyret du vill uppleva och valj hur lang boken ska vara.</p>
+              <div className="wiz-title">Vad ska hända?</div>
+              <p className="wiz-sub">Beskriv äventyret du vill uppleva och välj hur lång boken ska vara.</p>
 
               <div className="wiz-card">
-                <label className="wiz-label">Bokens langd</label>
+                <label className="wiz-label">Bokens längd</label>
                 <div className="wiz-chips">
                   {[{count:4,label:'4 sidor',desc:'Snabbis'},{count:8,label:'8 sidor',desc:'Lagom'},{count:12,label:'12 sidor',desc:'Fyllig'},{count:16,label:'16 sidor',desc:'Episk'}].map((opt) => (
                     <button key={opt.count} onClick={() => setPageCount(opt.count)} className={'wiz-chip' + (pageCount === opt.count ? ' active-gold' : '')}>
@@ -1099,9 +1099,9 @@ export default function Page() {
               </div>
 
               <div className="wiz-card">
-                <label className="wiz-label">Beskriv aventyret</label>
-                <textarea className="wiz-textarea" rows={5} placeholder={"t.ex. " + (charName || "Huvudpersonen") + " reser till manen och hittar en mystisk robot som behover hjalp att hitta hem..."} value={memory} onChange={(e) => setMemory(e.target.value)} />
-                <p style={{fontSize:'0.8rem', color:'#9ca3af', marginTop:'0.5rem'}}>Tips: ju mer detaljer du ger, desto battre blir boken.</p>
+                <label className="wiz-label">Beskriv äventyret</label>
+                <textarea className="wiz-textarea" rows={5} placeholder={"t.ex. " + (charName || "Huvudpersonen") + " reser till månen och hittar en mystisk robot som behöver hjälp att hitta hem..."} value={memory} onChange={(e) => setMemory(e.target.value)} />
+                <p style={{fontSize:'0.8rem', color:'#9ca3af', marginTop:'0.5rem'}}>Tips: ju mer detaljer du ger, desto bättre blir boken.</p>
               </div>
             </>
           )}
@@ -1110,20 +1110,20 @@ export default function Page() {
             <>
               <div className="wiz-eyebrow">Steg 4 av 4</div>
               <div className="wiz-title">Allt ser bra ut!</div>
-              <p className="wiz-sub">Kolla igenom detaljerna och tryck pa Skapa bok nar du ar redo.</p>
+              <p className="wiz-sub">Kolla igenom detaljerna och tryck på Skapa bok när du är redo.</p>
 
               <div className="wiz-card">
-                <div className="wiz-summary-row"><span className="wiz-summary-key">Karaktar</span><span className="wiz-summary-val">{charName || 'Ej angett'}</span></div>
+                <div className="wiz-summary-row"><span className="wiz-summary-key">Karaktär</span><span className="wiz-summary-val">{charName || 'Ej angett'}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Typ</span><span className="wiz-summary-val">{charDesc}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Outfit</span><span className="wiz-summary-val">{customOutfit || charOutfit || 'Standard'}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Stil</span><span className="wiz-summary-val">{{digital_painting:'Digital Painting',ligne_claire:'Ligne Claire',american_comic:'Amerikansk serie',watercolor:'Akvarell',noir:'Noir',pop_art:'Pop Art'}[bookStyle]}</span></div>
-                <div className="wiz-summary-row"><span className="wiz-summary-key">Foljslagare</span><span className="wiz-summary-val">{companionType === 'none' ? 'Ingen' : (companionName || companionType)}</span></div>
+                <div className="wiz-summary-row"><span className="wiz-summary-key">Följeslagare</span><span className="wiz-summary-val">{companionType === 'none' ? 'Ingen' : (companionName || companionType)}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Sidor</span><span className="wiz-summary-val">{pageCount} sidor</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">AI-modell</span><span className="wiz-summary-val">{trainedModelId ? 'Redo' : 'Saknas'}</span></div>
               </div>
 
               <div className="wiz-card">
-                <label className="wiz-label">Aventyr</label>
+                <label className="wiz-label">Äventyr</label>
                 <p style={{fontSize:'0.95rem', lineHeight:'1.6', color:'#1a1a2e'}}>{memory}</p>
               </div>
             </>
@@ -1149,7 +1149,7 @@ export default function Page() {
                 <button
                   className="book-nav-arrow book-nav-arrow-left"
                   onClick={handleBookPrev}
-                  aria-label="Foregaende sida"
+                  aria-label="Föregående sida"
                 >
                   ‹
                 </button>
@@ -1223,7 +1223,7 @@ export default function Page() {
                 <button
                   className="book-nav-arrow book-nav-arrow-right"
                   onClick={handleBookNext}
-                  aria-label="Nasta sida"
+                  aria-label="Nästa sida"
                 >
                   ›
                 </button>
@@ -1245,7 +1245,7 @@ export default function Page() {
               <div className="book-external-regen" style={{ maxWidth: bookSize.mobile ? bookSize.width : bookSize.width * 2 }}>
                 <input
                   type="text"
-                  placeholder="Andra nagot i bilden..."
+                  placeholder="Ändra något i bilden..."
                   value={customPrompts[0] || ''}
                   onChange={(e) => handleRegenChange(0, e.target.value)}
                   disabled={!!panelsLoading[0]}
@@ -1288,7 +1288,7 @@ export default function Page() {
           )}
           {step < 4 && (
             <button className="wiz-btn-next" onClick={() => setStep(s => s + 1)} disabled={step === 1 && !trainedModelId}>
-              {step === 1 && !trainedModelId ? 'Trana AI forst' : 'Nasta steg'}
+              {step === 1 && !trainedModelId ? 'Träna AI först' : 'Nästa steg'}
             </button>
           )}
           {step === 4 && (

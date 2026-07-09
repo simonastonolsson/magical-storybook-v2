@@ -19,17 +19,28 @@ export async function GET(request: Request) {
 
     if (training.status === 'succeeded') {
       const weightsUrl = training.output?.weights || null;
-      
-      let fullPath = null;
-      // FIXEN: Vi sparar i det officiella formatet med kolon (owner/model:version)
-      if (training.destination && training.output?.version) {
-        fullPath = `${training.destination}:${training.output.version}`;
-      } else {
-        fullPath = weightsUrl;
+
+      // destination + output.version (owner/model:version) is the only valid
+      // model reference for replicate.run() in generate-image/route.ts.
+      // weightsUrl is a raw .tar weights file - never a valid model reference.
+      // Previously this silently fell back to weightsUrl when destination/
+      // version were missing, which saved an unusable model_path with no
+      // error until image generation failed much later. Fail loudly instead.
+      if (!training.destination || !training.output?.version) {
+        console.error(
+          'Training succeeded but destination/output.version missing from Replicate response. Full training.output:',
+          JSON.stringify(training.output)
+        );
+        return NextResponse.json({
+          status: 'failed',
+          error: 'Training succeeded but destination/version missing from Replicate response',
+        }, { status: 500 });
       }
 
-      return NextResponse.json({ 
-        status: 'succeeded', 
+      const fullPath = `${training.destination}:${training.output.version}`;
+
+      return NextResponse.json({
+        status: 'succeeded',
         fullPath: fullPath,
         weights: weightsUrl
       });

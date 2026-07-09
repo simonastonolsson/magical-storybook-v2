@@ -21,7 +21,21 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ models: data });
+  // Lets the client resume/finalize trainings that were still in progress the
+  // last time this account was seen (e.g. the tab was closed or reloaded
+  // mid-training) - see app/api/check-training/route.ts for how these get
+  // created and finalized.
+  const { data: pendingTrainings, error: pendingError } = await supabase
+    .from('pending_trainings')
+    .select('training_id, model_name, trigger_word, created_at')
+    .eq('status', 'training')
+    .order('created_at', { ascending: false });
+
+  if (pendingError) {
+    console.error('Failed to load pending trainings:', pendingError);
+  }
+
+  return NextResponse.json({ models: data, pendingTrainings: pendingTrainings || [] });
 }
 
 export async function POST(request: Request) {

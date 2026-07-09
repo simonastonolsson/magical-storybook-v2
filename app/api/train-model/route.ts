@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
+import { createClient } from '@/lib/supabase/server';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -7,10 +8,25 @@ const replicate = new Replicate({
 
 export async function POST(request: Request) {
   try {
-    const { zipUrl, triggerWord } = await request.json();
+    const { zipUrl, triggerWord, characterName, charDesc, referenceImageUrl } = await request.json();
 
     if (!zipUrl) {
       return NextResponse.json({ error: 'Missing zipUrl' }, { status: 400 });
+    }
+
+    // characterName is only sent for main-character training (not companion
+    // training - see startTrainingJob in app/skapa/page.tsx), which is what
+    // gates whether a pending_trainings row gets created below. Companion
+    // trainings intentionally keep their pre-existing behavior (no DB
+    // persistence, localStorage only) - out of scope for this fix.
+    let userId: string | null = null;
+    if (characterName) {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      userId = user.id;
     }
 
     const targetTriggerWord = triggerWord || 'TOK';
@@ -50,6 +66,24 @@ export async function POST(request: Request) {
         },
       }
     );
+
+    if (userId) {
+      const supabase = createClient();
+      const { error: pendingError } = await supabase.from('pending_trainings').insert({
+        user_id: userId,
+        training_id: training.id,
+        trigger_word: targetTriggerWord,
+        model_name: characterName,
+        char_desc: charDesc ?? null,
+        reference_image_url: referenceImageUrl ?? null,
+      });
+      if (pendingError) {
+        // Not fatal to the training itself (it's already running on Replicate),
+        // but means this training can't be resumed/auto-finalized if the tab
+        // closes - log loudly so it's visible.
+        console.error('Failed to save pending_trainings row:', pendingError);
+      }
+    }
 
     return NextResponse.json({ trainingId: training.id });
   } catch (error) {

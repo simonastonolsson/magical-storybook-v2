@@ -216,12 +216,17 @@ export default function Page() {
       try {
         const res = await fetch('/api/user-models');
         if (!res.ok) return;
-        const { models } = await res.json();
+        const { models, pendingTrainings } = await res.json();
         setSavedCharacters(models || []);
         if (models?.length === 1) {
           selectCharacter(models[0]);
         } else if (models?.length > 1) {
           setShowCharacterPicker(true);
+        }
+        if (pendingTrainings) {
+          for (const pending of pendingTrainings) {
+            resumePendingTraining(pending);
+          }
         }
       } catch (err) {
         console.error('Failed to load saved models', err);
@@ -295,7 +300,33 @@ export default function Page() {
     return data.url;
   };
 
-  const startTrainingJob = async (files: File[], onStatusChange: (s: string) => void, triggerWord: string): Promise<string> => {
+  // Polls /api/check-training every 15s until the training reaches a final
+  // state. check-training itself is now the source of truth: for
+  // main-character trainings (characterInfo passed to startTrainingJob) it
+  // finalizes the pending_trainings row and creates the user_models row
+  // server-side on success, so this resolves with that already-created
+  // model (if any) instead of the caller having to save it separately -
+  // that's what lets a training survive the tab closing/reloading.
+  const pollTrainingUntilDone = (trainingId: string, onStatusChange: (s: string) => void): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const checkInterval = setInterval(async () => {
+        try {
+          const checkRes = await fetch('/api/check-training?id=' + trainingId);
+          const checkData = await checkRes.json();
+          if (checkData.status === 'succeeded') { clearInterval(checkInterval); resolve(checkData); }
+          else if (checkData.status === 'failed' || checkData.status === 'canceled') { clearInterval(checkInterval); reject(new Error(checkData.error || 'Training failed')); }
+          else { onStatusChange('Tränar... (' + checkData.status + ')'); }
+        } catch (err) { clearInterval(checkInterval); reject(err); }
+      }, 15000);
+    });
+  };
+
+  const startTrainingJob = async (
+    files: File[],
+    onStatusChange: (s: string) => void,
+    triggerWord: string,
+    characterInfo?: { modelName: string; charDesc: string; referenceImageUrl: string }
+  ): Promise<any> => {
     onStatusChange('Packar bilderna...');
     const zip = new JSZip();
     for (let i = 0; i < files.length; i++) {
@@ -314,22 +345,40 @@ export default function Page() {
     const trainRes = await fetch('/api/train-model', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zipUrl: rawZipUrl, triggerWord }),
+      body: JSON.stringify({
+        zipUrl: rawZipUrl,
+        triggerWord,
+        ...(characterInfo ? {
+          characterName: characterInfo.modelName,
+          charDesc: characterInfo.charDesc,
+          referenceImageUrl: characterInfo.referenceImageUrl,
+        } : {}),
+      }),
     });
     if (!trainRes.ok) throw new Error('Training failed to start');
     const { trainingId } = await trainRes.json();
-    return new Promise((resolve, reject) => {
-      onStatusChange('AI:n tränas... Stäng inte sidan.');
-      const checkInterval = setInterval(async () => {
-        try {
-          const checkRes = await fetch('/api/check-training?id=' + trainingId);
-          const checkData = await checkRes.json();
-          if (checkData.status === 'succeeded') { clearInterval(checkInterval); resolve(checkData.fullPath); }
-          else if (checkData.status === 'failed' || checkData.status === 'canceled') { clearInterval(checkInterval); reject(new Error('Training failed')); }
-          else { onStatusChange('Tränar... (' + checkData.status + ')'); }
-        } catch (err) { clearInterval(checkInterval); reject(err); }
-      }, 15000);
-    });
+    onStatusChange('AI:n tränas... Stäng inte sidan.');
+    return pollTrainingUntilDone(trainingId, onStatusChange);
+  };
+
+  // Picks up a training that was still running the last time this account
+  // was seen (tab closed/reloaded mid-training) - see pending_trainings and
+  // check-training/route.ts. By the time our own poll here observes
+  // "succeeded", the server has already created the user_models row, so
+  // this never requires the customer to do anything.
+  const resumePendingTraining = async (pending: { training_id: string; model_name: string }) => {
+    try {
+      setTrainingStatus('Fortsätter en pågående träning ("' + pending.model_name + '")...');
+      const checkData = await pollTrainingUntilDone(pending.training_id, setTrainingStatus);
+      if (checkData.model) {
+        setSavedCharacters(prev => [checkData.model, ...prev]);
+        setShowCharacterPicker(true);
+        setTrainingStatus('Klart! "' + pending.model_name + '" är redo och tillagd bland dina karaktärer.');
+      }
+    } catch (err) {
+      console.error('Resumed training failed', err);
+      alert('Träningen för "' + pending.model_name + '" misslyckades medan du var borta. Försök träna igen.');
+    }
   };
 
   const handleStartTraining = async () => {
@@ -344,31 +393,15 @@ export default function Page() {
       setTrainingStatus('Sparar referensfoto...');
       const refUrl = await uploadReferenceImageToBlob(selectedFiles[0]);
       setReferenceImageUrl(refUrl);
-      const path = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger);
-      setTrainedModelId(path);
-      setTrainingStatus('Sparar din AI-karaktär...');
-      try {
-        const saveRes = await fetch('/api/user-models', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model_path: path,
-            model_name: charName || 'Min karaktär',
-            trigger_word: charTrigger,
-            char_desc: charDesc,
-            reference_image_url: refUrl,
-          }),
-        });
-        if (saveRes.ok) {
-          const { model } = await saveRes.json();
-          setSavedModelDbId(model.id);
-          setSavedCharacters(prev => [model, ...prev]);
-        } else if (saveRes.status === 409) {
-          const { error } = await saveRes.json();
-          alert(error || 'Du har redan en karaktär med det namnet, välj ett annat namn.');
-        }
-      } catch (saveErr) {
-        console.error('Failed to save model to account', saveErr);
+      const checkData = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger, {
+        modelName: charName || 'Min karaktär',
+        charDesc,
+        referenceImageUrl: refUrl,
+      });
+      setTrainedModelId(checkData.fullPath);
+      if (checkData.model) {
+        setSavedModelDbId(checkData.model.id);
+        setSavedCharacters(prev => [checkData.model, ...prev]);
       }
       setTrainingStatus('Klart! Din AI-karaktär är redo.');
     } catch (err) {
@@ -382,9 +415,9 @@ export default function Page() {
     setIsTrainingCompanion(true);
     try {
       const companionTriggerWord = companionName.replace(/[^a-zA-Z]/g, "").toUpperCase() + 'TOK';
-      const path = await startTrainingJob(companionFiles, setCompanionTrainingStatus, companionTriggerWord);
-      setCompanionModelId(path);
-      localStorage.setItem('my_saved_companion_lora_model', path);
+      const checkData = await startTrainingJob(companionFiles, setCompanionTrainingStatus, companionTriggerWord);
+      setCompanionModelId(checkData.fullPath);
+      localStorage.setItem('my_saved_companion_lora_model', checkData.fullPath);
       setCompanionTrainingStatus('Klart!');
     } catch (err) {
       console.error(err);

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN } as any);
 
-const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualityBoost: string; qualityBoostNoLighting: string; styleConsistency: string; loraScale: number; loraScaleChild: number; loraScaleSolo: number; loraScaleSoloChild: number }> = {
+const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualityBoost: string; qualityBoostNoLighting: string; styleConsistency: string; loraScale: number; loraScaleChild: number; loraScaleSolo: number; loraScaleSoloChild: number; loraScaleCrowd: number; loraScaleCrowdChild: number }> = {
   digital_painting: {
     positive: "digital painted illustration, painterly art style, soft brush strokes, natural volumetric lighting, cinematic composition, detailed background environment, high quality digital painting, concept art, story illustration",
     negative: "photograph, photorealistic, DSLR, 3D CGI, Pixar, anime, chibi, flat colors, hard outlines, duplicates",
@@ -13,7 +13,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     loraScale: 0.80,
     loraScaleChild: 0.88,
     loraScaleSolo: 0.85,
-    loraScaleSoloChild: 0.93
+    loraScaleSoloChild: 0.93,
+    loraScaleCrowd: 0.83,
+    loraScaleCrowdChild: 0.91
   },
   ligne_claire: {
     positive: "ligne claire comic art style, clean precise ink outlines, flat cel colors, bright even lighting, clear readable panels, European bande dessinee style, Tintin inspired illustration, bold outlines, simple clean backgrounds",
@@ -24,7 +26,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     loraScale: 0.78,
     loraScaleChild: 0.85,
     loraScaleSolo: 0.83,
-    loraScaleSoloChild: 0.90
+    loraScaleSoloChild: 0.90,
+    loraScaleCrowd: 0.81,
+    loraScaleCrowdChild: 0.88
   },
   american_comic: {
     positive: "American superhero comic book art, bold ink outlines, dynamic composition, strong contrasting colors, Marvel DC style illustration, halftone dots, dramatic lighting, action comic panel, professional comic art",
@@ -35,7 +39,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     loraScale: 0.78,
     loraScaleChild: 0.85,
     loraScaleSolo: 0.83,
-    loraScaleSoloChild: 0.90
+    loraScaleSoloChild: 0.90,
+    loraScaleCrowd: 0.81,
+    loraScaleCrowdChild: 0.88
   },
   watercolor: {
     positive: "cozy heartwarming 2D hand-drawn watercolor storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
@@ -46,7 +52,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     loraScale: 0.85,
     loraScaleChild: 0.90,
     loraScaleSolo: 0.90,
-    loraScaleSoloChild: 0.95
+    loraScaleSoloChild: 0.95,
+    loraScaleCrowd: 0.88,
+    loraScaleCrowdChild: 0.93
   },
   noir: {
     positive: "black and white noir comic illustration, high contrast ink drawing, dramatic shadows, cross-hatching technique, graphic novel art style, Sin City inspired, expressive ink lines, moody atmosphere, detailed pen and ink illustration",
@@ -57,7 +65,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     loraScale: 0.78,
     loraScaleChild: 0.85,
     loraScaleSolo: 0.83,
-    loraScaleSoloChild: 0.90
+    loraScaleSoloChild: 0.90,
+    loraScaleCrowd: 0.81,
+    loraScaleCrowdChild: 0.88
   },
   pop_art: {
     positive: "Roy Lichtenstein pop art comic style, bold black outlines, Ben-Day dots pattern, primary flat colors, retro comic book illustration, speech bubbles style, graphic pop art panel, strong graphic design aesthetic",
@@ -68,7 +78,9 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
     loraScale: 0.75,
     loraScaleChild: 0.82,
     loraScaleSolo: 0.80,
-    loraScaleSoloChild: 0.87
+    loraScaleSoloChild: 0.87,
+    loraScaleCrowd: 0.78,
+    loraScaleCrowdChild: 0.85
   }
 };
 
@@ -175,11 +187,25 @@ export async function POST(request: Request) {
     // the only case where a higher lora_scale carries no leakage risk to
     // other people in frame.
     const soloSceneBoostApplied = !extraLoraId && !hasMultiplePeople && !hasSecondaryPerson;
+
+    // Experiment H: a smaller, deliberately more cautious boost for scenes
+    // that DO have crowd/group/secondary-person keywords (i.e. exactly the
+    // scenes experiment B/F correctly deny the larger solo boost to) - a
+    // conscious tradeoff of somewhat higher leakage risk for hopefully better
+    // main-character likeness. Only triggered by detected crowd/secondary-
+    // person text, not merely by extraLoraId being set with no such keywords
+    // (a companion referenced only by trigger word keeps the plain base
+    // value - untouched, most conservative). Separate from experiment B's
+    // fields entirely, so it can be rolled back independently.
+    const crowdSceneMinorBoostApplied = !soloSceneBoostApplied && (hasMultiplePeople || hasSecondaryPerson);
+
     const activeLoraScale = soloSceneBoostApplied
       ? (isChild ? style.loraScaleSoloChild : style.loraScaleSolo)
-      : (isChild ? style.loraScaleChild : style.loraScale);
+      : crowdSceneMinorBoostApplied
+        ? (isChild ? style.loraScaleCrowdChild : style.loraScaleCrowd)
+        : (isChild ? style.loraScaleChild : style.loraScale);
 
-    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
+    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | crowdSceneMinorBoostApplied: " + crowdSceneMinorBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,

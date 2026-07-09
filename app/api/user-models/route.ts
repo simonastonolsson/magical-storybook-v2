@@ -43,6 +43,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: existing } = await supabase
+    .from('user_models')
+    .select('id')
+    .eq('user_id', user.id)
+    .ilike('model_name', body.model_name)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json(
+      { error: 'Du har redan en karaktär som heter ' + body.model_name + ', välj ett annat namn.' },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await supabase
     .from('user_models')
     .insert({

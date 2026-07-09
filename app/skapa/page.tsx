@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, forwardRef } from 'react';
 import JSZip from 'jszip';
 import HTMLFlipBook from 'react-pageflip';
 import { signOut } from '@/app/auth/actions';
+import type { UserModel } from '@/lib/models';
 
 interface BookPageProps {
   panel: any;
@@ -131,6 +132,8 @@ export default function Page() {
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [savedModelDbId, setSavedModelDbId] = useState<string | null>(null);
   const [charDescSaveStatus, setCharDescSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [savedCharacters, setSavedCharacters] = useState<UserModel[]>([]);
+  const [showCharacterPicker, setShowCharacterPicker] = useState(false);
 
   const [charName, setCharacterName] = useState('');
   const [charDesc, setCharacterDescription] = useState('an adult man');
@@ -176,26 +179,45 @@ export default function Page() {
     setCharacterTrigger(cleanName ? cleanName + 'TOK' : 'TOK');
   }, [charName]);
 
+  const selectCharacter = (model: UserModel) => {
+    setSavedModelDbId(model.id);
+    setTrainedModelId(model.model_path);
+    setReferenceImageUrl(model.reference_image_url);
+    setCharacterName(model.model_name);
+    setCharacterDescription(model.char_desc || 'an adult man');
+    setTrainingStatus('AI-modell hittad och redo!');
+    setShowCharacterPicker(false);
+  };
+
+  const handleDeleteCharacter = async (id: string) => {
+    try { await fetch('/api/user-models/' + id, { method: 'DELETE' }); }
+    catch (err) { console.error('Failed to delete character', err); }
+    setSavedCharacters(prev => prev.filter(m => m.id !== id));
+    if (savedModelDbId === id) {
+      setSavedModelDbId(null);
+      setTrainedModelId(null);
+      setReferenceImageUrl(null);
+      setTrainingStatus('');
+    }
+  };
+
   useEffect(() => {
-    const loadSavedModel = async () => {
+    const loadSavedModels = async () => {
       try {
         const res = await fetch('/api/user-models');
         if (!res.ok) return;
         const { models } = await res.json();
-        const savedModel = models?.[0];
-        if (savedModel) {
-          setSavedModelDbId(savedModel.id);
-          setTrainedModelId(savedModel.model_path);
-          setReferenceImageUrl(savedModel.reference_image_url);
-          setCharacterName(savedModel.model_name);
-          setCharacterDescription(savedModel.char_desc || 'an adult man');
-          setTrainingStatus('AI-modell hittad och redo!');
+        setSavedCharacters(models || []);
+        if (models?.length === 1) {
+          selectCharacter(models[0]);
+        } else if (models?.length > 1) {
+          setShowCharacterPicker(true);
         }
       } catch (err) {
-        console.error('Failed to load saved model', err);
+        console.error('Failed to load saved models', err);
       }
     };
-    loadSavedModel();
+    loadSavedModels();
 
     const savedCompanion = localStorage.getItem('my_saved_companion_lora_model');
     if (savedCompanion && savedCompanion.includes('/')) {
@@ -302,6 +324,11 @@ export default function Page() {
 
   const handleStartTraining = async () => {
     if (selectedFiles.length < 5) { alert("Ladda upp minst 5 bilder!"); return; }
+    const trimmedName = charName.trim();
+    if (savedCharacters.some(m => m.model_name.trim().toLowerCase() === trimmedName.toLowerCase())) {
+      alert('Du har redan en karaktär som heter ' + trimmedName + ', välj ett annat namn.');
+      return;
+    }
     setIsTraining(true);
     try {
       setTrainingStatus('Sparar referensfoto...');
@@ -325,6 +352,10 @@ export default function Page() {
         if (saveRes.ok) {
           const { model } = await saveRes.json();
           setSavedModelDbId(model.id);
+          setSavedCharacters(prev => [model, ...prev]);
+        } else if (saveRes.status === 409) {
+          const { error } = await saveRes.json();
+          alert(error || 'Du har redan en karaktär med det namnet, välj ett annat namn.');
         }
       } catch (saveErr) {
         console.error('Failed to save model to account', saveErr);
@@ -860,6 +891,30 @@ export default function Page() {
               <div className="wiz-title">Vem ar stjarnan?</div>
               <p className="wiz-sub">Beratta vem boken ska handla om och ladda upp foton sa att AI:n kan skapa din unika karaktar.</p>
 
+              {showCharacterPicker && !trainedModelId && (
+                <div className="wiz-card">
+                  <label className="wiz-label">Valj karaktar</label>
+                  <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Du har flera sparade karaktarer - valj en att anvanda, eller trana en ny.</p>
+                  <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
+                    {savedCharacters.map((m) => (
+                      <div key={m.id} style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.9rem', border:'1.5px solid #e5e0d8', borderRadius:'12px'}}>
+                        {m.reference_image_url && (
+                          <img src={m.reference_image_url} alt={m.model_name} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover'}} />
+                        )}
+                        <span style={{flex:1, fontWeight:600}}>{m.model_name}</span>
+                        <button className="wiz-chip" onClick={() => selectCharacter(m)}>Valj</button>
+                        <button className="wiz-delete-link" onClick={() => handleDeleteCharacter(m.id)}>Ta bort</button>
+                      </div>
+                    ))}
+                  </div>
+                  <button className="wiz-upload-btn" style={{marginTop:'1rem'}} onClick={() => setShowCharacterPicker(false)}>
+                    + Trana en ny karaktar istallet
+                  </button>
+                </div>
+              )}
+
+              {(!showCharacterPicker || trainedModelId) && (
+              <>
               <div className="wiz-card">
                 <div className="wiz-grid-2" style={{marginBottom:'1rem'}}>
                   <div>
@@ -944,20 +999,21 @@ export default function Page() {
                   <div className={'wiz-status' + (trainedModelId ? ' wiz-success' : '')}>{trainingStatus}</div>
                 )}
                 {trainedModelId && (
-                  <button className="wiz-delete-link" onClick={async () => {
+                  <button className="wiz-delete-link" onClick={() => {
                     if (savedModelDbId) {
-                      try { await fetch('/api/user-models/' + savedModelDbId, { method: 'DELETE' }); }
-                      catch (err) { console.error('Failed to delete saved model', err); }
+                      handleDeleteCharacter(savedModelDbId);
+                    } else {
+                      setTrainedModelId(null);
+                      setReferenceImageUrl(null);
+                      setTrainingStatus('');
                     }
-                    setSavedModelDbId(null);
-                    setTrainedModelId(null);
-                    setReferenceImageUrl(null);
-                    setTrainingStatus('');
                   }}>
                     Ta bort och trana ny karaktar
                   </button>
                 )}
               </div>
+              </>
+              )}
             </>
           )}
 

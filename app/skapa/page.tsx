@@ -992,7 +992,14 @@ export default function Page() {
 
               <div className="wiz-card">
                 <label className="wiz-label">Foton (minst 5)</label>
-                <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Ladda upp selfies eller porträttbilder där ansiktet syns tydligt. Fler bilder = bättre likhet.</p>
+                <ul style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.6', paddingLeft:'1.1rem'}}>
+                  <li>Helst 10-15 bilder för bästa likhet (minst 5 krävs)</li>
+                  <li>Variera vinklar: rakt framifrån, tre-kvarts, gärna någon lätt uppifrån/nedifrån</li>
+                  <li>Bra, jämn belysning - undvik starka skuggor och bakljus</li>
+                  <li>Inga solglasögon, hattar eller annat som döljer ansiktet</li>
+                  <li>Samma frisyr/skägg på alla bilder</li>
+                  <li>Olika bakgrunder/miljöer, inte bara en plats eller ett tillfälle</li>
+                </ul>
                 <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" style={{display:'none'}} />
                 <div style={{display:'flex', alignItems:'center', gap:'1rem', flexWrap:'wrap'}}>
                   <button className="wiz-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null}>

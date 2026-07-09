@@ -111,9 +111,17 @@ export async function POST(req: Request) {
          - Describe ONLY the pose, action, and immediate setting/environment (e.g.
            "standing proudly over a finished gourmet dish in a warmly lit kitchen, holding
            a wooden spoon triumphantly").
-         - Do NOT mention or describe the character's physical appearance, age, gender,
+         - Do NOT mention or describe ${trigger}'s physical appearance, age, gender,
            species, body type, or outfit in "cover_scene" - that is handled separately
            elsewhere in the pipeline and must not be repeated, changed, or contradicted here.
+           This restriction applies ONLY to ${trigger} (the main character).
+         - EXCEPTION FOR THE COMPANION: if the companion also appears in the cover scene,
+           you MUST describe its species/form/appearance just as clearly as you would in a
+           regular panel (e.g. "a green dinosaur", not just its name). The companion does
+           NOT have the same technical appearance-lock protection that ${trigger} has
+           elsewhere in the pipeline - it depends entirely on you actually describing it
+           correctly in every context, including the cover. Never reduce the companion to
+           just its name here.
          - Do NOT include the trigger word "${trigger}" anywhere in "cover_scene" - it is
            added automatically immediately before this text when building the final cover
            image prompt.

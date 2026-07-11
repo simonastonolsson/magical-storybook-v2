@@ -16,17 +16,38 @@ interface BookPageProps {
 
 // react-pageflip's clickEventForward only whitelists <a> and <button> tags -
 // it calls preventDefault() on mousedown for anything else (including
-// <textarea>), which silently blocks them from ever getting focus. Rather
-// than moving the textarea out of the page (which broke per-page narration
-// in two-page spread mode), we stop the mousedown/touchstart event from
-// bubbling up to page-flip's own listener, which is attached higher up the
-// tree in the bubble phase.
-const stopPageFlipFocusSteal = (e: { stopPropagation: () => void }) => e.stopPropagation();
-
+// <textarea>), which silently blocks them from ever getting focus.
+//
+// A React onMouseDown/onTouchStart prop can't fix this: page-flip attaches
+// its own listener directly to a real DOM node (.stf__block, created via
+// raw insertAdjacentHTML, not rendered by React) that sits between the
+// textarea and the app's React root. Since React 17+ delegates synthetic
+// events to the root container, our prop handler only runs once the event
+// has already bubbled past .stf__block in the real DOM - by then
+// page-flip's own listener has already fired and already called
+// preventDefault(), blocking focus, regardless of what we do afterwards.
+//
+// A real, native addEventListener call directly on the textarea itself
+// runs in actual native bubble order (child before parent), so it can
+// call stopPropagation() before the event ever reaches .stf__block.
 const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
   { panel, totalPages, imageUrl, isGeneratingThisPanel, onNarrationChange },
   ref
 ) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const stopNative = (e: Event) => e.stopPropagation();
+    el.addEventListener('mousedown', stopNative);
+    el.addEventListener('touchstart', stopNative);
+    return () => {
+      el.removeEventListener('mousedown', stopNative);
+      el.removeEventListener('touchstart', stopNative);
+    };
+  }, []);
+
   return (
     <div className="book-page" ref={ref}>
       <div className="book-page-image-wrap">
@@ -40,12 +61,11 @@ const BookPage = forwardRef<HTMLDivElement, BookPageProps>(function BookPage(
         )}
       </div>
       <textarea
+        ref={textareaRef}
         className="book-page-text"
         rows={3}
         value={panel.narration}
         onChange={(e) => onNarrationChange(panel.panel_number, e.target.value)}
-        onMouseDown={stopPageFlipFocusSteal}
-        onTouchStart={stopPageFlipFocusSteal}
       />
       <div className="book-page-number">{panel.panel_number} / {totalPages}</div>
     </div>

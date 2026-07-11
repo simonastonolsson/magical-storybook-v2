@@ -127,7 +127,27 @@ export async function POST(req: Request) {
            endpoint never receives bookStyle), so this instruction cannot be
            tailored per style here even if it turns out only some styles are
            actually affected.
-      11. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
+      11. POSE MODERATION RULE (STRICT CONSISTENCY RULE - keeps body rendering
+          close to the reference photos, regardless of book style):
+         - Avoid extreme, wide, symmetrical body poses in image_prompt
+           descriptions - e.g. do NOT write "arms raised in a triumphant/
+           victorious pose", "jumping for joy", "arms thrown up in
+           celebration", or similarly large, dramatic, symmetrically
+           outstretched body language.
+         - Prefer more restrained, natural body language instead - e.g.
+           "smiling, one hand raised in a small wave", "standing confidently
+           with a slight smile", "giving a thumbs up" - body language that is
+           happy/positive but not extreme or symmetrical.
+         - Just like EXPRESSION MODERATION RULE: the action or narration can
+           still be dramatic (e.g. "he just won the match!"), but the pose
+           described in image_prompt should stay understated.
+         - This rule applies to every panel's image_prompt, regardless of
+           which book style is ultimately chosen for the illustration - the
+           story is generated before a style is selected downstream (this
+           endpoint never receives bookStyle), so this instruction cannot be
+           tailored per style here even if it turns out only some styles are
+           actually affected.
+      12. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
          - Write a "cover_scene": exactly ONE sentence, in ENGLISH, describing a specific,
            iconic moment or pose that is genuinely representative of the story you just
            wrote in the panels array above - not a generic, unrelated action pose.

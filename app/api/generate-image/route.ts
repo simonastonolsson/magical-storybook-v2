@@ -93,7 +93,7 @@ const intenseLightingKeywords = /\b(sunset|sunrise|golden hour|dusk|twilight|war
 
 export async function POST(request: Request) {
   try {
-    const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, extraLoraId, extraLoraScale, seed } = await request.json();
+    const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, extraLoraId, extraLoraScale, seed, isCover } = await request.json();
 
     console.log("generate-image request body:", { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, seed });
 
@@ -197,6 +197,22 @@ export async function POST(request: Request) {
     const sceneHasIntenseLighting = intenseLightingKeywords.test(cleanedPrompt);
     const qualityBoost = sceneHasIntenseLighting ? style.qualityBoostNoLighting : style.qualityBoost;
 
+    // Cover prompts (buildCoverPrompt in app/skapa/page.tsx) bake their own
+    // composition/lighting flourish directly into the scene text itself
+    // ("layered composition with a detailed background scene... cinematic
+    // dramatic lighting, high contrast, bold saturated colors, epic
+    // composition"), on top of the SAME qualityBoost panels also get - a
+    // genuine double dose, confirmed not caught by sceneHasIntenseLighting
+    // above (word-boundary fails to match "lighting" against the
+    // "dramatic light" keyword, so cover never gets qualityBoostNoLighting).
+    // Panels only ever get the single qualityBoost dose, since Gemini's own
+    // scene text is comparatively plain/functional. Give panels an
+    // equivalent second layer here - deliberately using different words
+    // than qualityBoost already contributes ("rich composition", "vivid
+    // saturated colors", "cinematic dramatic lighting") to avoid repeating
+    // the same phrase twice in one prompt.
+    const panelCompositionBoost = ", layered scene composition with atmospheric depth, high contrast dramatic staging";
+
     // Read-only diagnostic for the "medium close-up shot" vs "waist-up...
     // medium shot" framing observation - no behavior change. Gemini picks
     // this phrase freely per panel from CAMERA FRAMING RULE's menu in
@@ -211,7 +227,7 @@ export async function POST(request: Request) {
     // style.positive block) - some models weight earlier tokens more heavily,
     // so this keeps the LoRA identity anchor from being diluted by a long
     // preamble. Same fragments as before, only reordered.
-    const finalPrompt = "Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. " + "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + style.styleConsistency;
+    const finalPrompt = "Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. " + "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + style.styleConsistency;
 
     // Experiment B: extraLoraId is only ever set when the companion's trigger
     // word is actually present in this prompt (see companionLoraIdForPrompt in
@@ -238,7 +254,7 @@ export async function POST(request: Request) {
         ? (isChild ? style.loraScaleCrowdChild : style.loraScaleCrowd)
         : (isChild ? style.loraScaleChild : style.loraScale);
 
-    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " (" + JSON.stringify(secondaryPersonMatches) + ")" + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | crowdSceneMinorBoostApplied: " + crowdSceneMinorBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
+    console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " (" + JSON.stringify(secondaryPersonMatches) + ")" + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | crowdSceneMinorBoostApplied: " + crowdSceneMinorBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,

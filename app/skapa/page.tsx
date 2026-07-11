@@ -460,7 +460,8 @@ export default function Page() {
             referenceImageUrl,
             extraLoraId: companionLoraIdForPrompt(panel.image_prompt),
             extraLoraScale: 0.8,
-            seed: baseSeed + i + 1
+            seed: baseSeed + i + 1,
+            isCover: false
           }),
         });
         if (response.ok) {
@@ -499,7 +500,8 @@ export default function Page() {
           referenceImageUrl,
           extraLoraId: companionLoraIdForPrompt(coverPrompt),
           extraLoraScale: 0.8,
-          seed: baseSeed
+          seed: baseSeed,
+          isCover: true
         }),
       });
       if (response.ok) {
@@ -586,7 +588,8 @@ export default function Page() {
           bookStyle,
           referenceImageUrl,
           extraLoraId: companionLoraIdForPrompt(refinedPrompt),
-          extraLoraScale: 0.8
+          extraLoraScale: 0.8,
+          isCover: false
         }),
       });
       if (response.ok) {
@@ -630,7 +633,8 @@ export default function Page() {
           bookStyle,
           referenceImageUrl,
           extraLoraId: companionLoraIdForPrompt(refinedPrompt),
-          extraLoraScale: 0.8
+          extraLoraScale: 0.8,
+          isCover: true
         }),
       });
       if (response.ok) {

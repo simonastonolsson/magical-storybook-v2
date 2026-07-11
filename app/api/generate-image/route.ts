@@ -164,7 +164,11 @@ export async function POST(request: Request) {
     // background teammates/spectators. Deliberately broad - better to miss a
     // boost opportunity than to risk leakage again.
     const multiPersonKeywords = /\b(crowd|crowds|spectator|spectators|audience|bystanders|onlookers|classmates|teammates|team-mates|team mates|players|other players|opposing team|opponents|skaters|other skaters|athletes|competitors|racers|dancers|singers|passengers|customers|guests|coworkers|colleagues|siblings|friends|family members|fans|cheering|stands|bleachers|stadium|arena|rink full of|group of|groups of|several people|many people|lots of people|dozens of|hundreds of|everyone|everybody|whole team|entire team|full team|packed (stands|arena|rink)|other (people|kids|children|students|players|skaters|athletes|teammates|racers|dancers|competitors)|companions|surrounded by|background characters|watching crowd|people watching)\b/i;
-    const hasMultiplePeople = multiPersonKeywords.test(cleanedPrompt);
+    // Diagnostic only: capture WHICH substring(s) actually matched, not just
+    // true/false, so a false positive on solo scenes can be pinned down to
+    // an exact word instead of guessed at.
+    const multiPersonMatches = cleanedPrompt.match(new RegExp(multiPersonKeywords.source, 'gi')) || [];
+    const hasMultiplePeople = multiPersonMatches.length > 0;
     const backgroundDiversity = hasMultiplePeople
       ? ", background characters have diverse and varied faces, different from the protagonist, unrelated bystanders with distinct individual appearances"
       : "";
@@ -180,7 +184,15 @@ export async function POST(request: Request) {
     // is keyword matching, not language understanding, so a pronoun-only
     // reference ("he handed her a gift") with no role noun isn't caught.
     const secondaryPersonKeywords = /\b(student|classmate|colleague|coworker|co-worker|teammate|friend|sibling|neighbor|neighbour|stranger|passerby|passer-by|visitor|guest|customer|client|patient|admirer|rival|opponent|librarian|teacher|doctor|nurse|waiter|waitress|cashier|driver|pedestrian|boy|girl|man|woman|kid|child|person|someone|figure|individual)\b/i;
-    const hasSecondaryPerson = secondaryPersonKeywords.test(cleanedPrompt);
+    // Diagnostic only, same reasoning as multiPersonMatches above. Suspect:
+    // Gemini's own image_prompt template embeds the main character's own
+    // ${desc} (e.g. "a young boy") directly into cleanedPrompt (see the JSON
+    // schema example in story/route.ts), and this list includes generic
+    // nouns like "boy"/"girl"/"man"/"woman"/"child" that would match that
+    // self-description on every single panel, regardless of whether any
+    // actual secondary character is in the scene.
+    const secondaryPersonMatches = cleanedPrompt.match(new RegExp(secondaryPersonKeywords.source, 'gi')) || [];
+    const hasSecondaryPerson = secondaryPersonMatches.length > 0;
 
     const sceneHasIntenseLighting = intenseLightingKeywords.test(cleanedPrompt);
     const qualityBoost = sceneHasIntenseLighting ? style.qualityBoostNoLighting : style.qualityBoost;
@@ -226,7 +238,7 @@ export async function POST(request: Request) {
         ? (isChild ? style.loraScaleCrowdChild : style.loraScaleCrowd)
         : (isChild ? style.loraScaleChild : style.loraScale);
 
-    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | crowdSceneMinorBoostApplied: " + crowdSceneMinorBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
+    console.log("Style: " + styleKey + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " (" + JSON.stringify(secondaryPersonMatches) + ")" + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | crowdSceneMinorBoostApplied: " + crowdSceneMinorBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
 
     const input: any = {
       prompt: finalPrompt,

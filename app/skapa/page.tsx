@@ -79,12 +79,17 @@ interface BookCoverProps {
   isGenerating?: boolean;
   onImageLoad?: () => void;
   onImageError?: () => void;
+  editable?: boolean;
+  onTitleChange?: (value: string) => void;
 }
 
 // Rendered standalone (outside HTMLFlipBook) so the cover/back cover can take
 // up the full spread width as one page, instead of react-pageflip's hard-page
 // mode, which still reserves a 2-page-wide slot and leaves the other half empty.
-function BookCoverPage({ variant, title, imageUrl, isGenerating, onImageLoad, onImageError }: BookCoverProps) {
+// Also reused for print/PDF export (see the print-only block further down) -
+// editable/onTitleChange are only passed at the interactive front-cover call
+// site, so print output and the back cover stay a plain, static heading.
+function BookCoverPage({ variant, title, imageUrl, isGenerating, onImageLoad, onImageError, editable, onTitleChange }: BookCoverProps) {
   if (variant === 'front') {
     return (
       <div className="book-page book-cover book-cover-front">
@@ -98,7 +103,17 @@ function BookCoverPage({ variant, title, imageUrl, isGenerating, onImageLoad, on
         ) : null}
         <div className="book-cover-overlay">
           <span className="book-cover-eyebrow">Storylabz</span>
-          <h2 className="book-cover-title">{title}</h2>
+          {editable ? (
+            <input
+              type="text"
+              className="book-cover-title-input"
+              value={title}
+              placeholder="Boktitel"
+              onChange={(e) => onTitleChange?.(e.target.value)}
+            />
+          ) : (
+            <h2 className="book-cover-title">{title}</h2>
+          )}
         </div>
       </div>
     );
@@ -707,6 +722,10 @@ export default function Page() {
     setComic((prev: any) => ({ ...prev, panels: prev.panels.map((p: any) => p.panel_number === panelNumber ? { ...p, narration: value } : p) }));
   };
 
+  const handleTitleChange = (value: string) => {
+    setComic((prev: any) => prev ? { ...prev, title: value } : prev);
+  };
+
   const handleRegenChange = (panelNumber: number, value: string) => {
     setCustomPrompts(prev => ({ ...prev, [panelNumber]: value }));
   };
@@ -900,6 +919,9 @@ export default function Page() {
         .book-cover-overlay { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; gap: 0.75rem; padding: 2rem 1.75rem 2.25rem; background: linear-gradient(to top, rgba(10,10,20,0.95) 0%, rgba(10,10,20,0.78) 32%, rgba(10,10,20,0.4) 58%, rgba(10,10,20,0) 88%); }
         .book-cover-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(232,184,75,0.85); }
         .book-cover-title { font-family: 'Playfair Display', serif; font-size: clamp(2.4rem, 6.5vw, 4.75rem); font-weight: 900; color: white; line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; text-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 10px 32px rgba(0,0,0,0.6); }
+        .book-cover-title-input { font-family: 'Playfair Display', serif; font-size: clamp(2.4rem, 6.5vw, 4.75rem); font-weight: 900; color: white; line-height: 1.02; letter-spacing: -0.01em; text-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 10px 32px rgba(0,0,0,0.6); background: transparent; border: none; outline: none; text-align: center; width: 100%; padding: 0; }
+        .book-cover-title-input:focus { outline: 2px dashed rgba(255,255,255,0.6); outline-offset: 4px; }
+        .book-cover-title-input::placeholder { color: rgba(255,255,255,0.5); }
         .book-cover-back { background: #1a1a2e; }
         .book-cover-back-label { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: rgba(255,255,255,0.6); letter-spacing: 0.08em; }
         .book-spine { position: absolute; top: 3%; bottom: 3%; left: 50%; width: 60px; margin-left: -30px; background: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 30%, rgba(0,0,0,0.24) 50%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0) 100%); pointer-events: none; z-index: 6; }
@@ -1230,7 +1252,7 @@ export default function Page() {
                   className="book-shadow-wrapper book-shadow-wrapper-single"
                   style={{ width: bookSize.width, height: bookSize.width * COVER_ASPECT }}
                 >
-                  <BookCoverPage variant="front" title={comic.title} imageUrl={coverImageUrl} isGenerating={isGeneratingCover} />
+                  <BookCoverPage variant="front" title={comic.title} imageUrl={coverImageUrl} isGenerating={isGeneratingCover} editable onTitleChange={handleTitleChange} />
                 </div>
               )}
 

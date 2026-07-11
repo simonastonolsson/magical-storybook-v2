@@ -109,7 +109,25 @@ export async function POST(req: Request) {
            the image_prompt itself.
          - Example: write "a friendly green dinosaur with a long neck and small arms",
            NOT "a friendly green cartoon-style dinosaur".
-      10. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
+      10. EXPRESSION MODERATION RULE (STRICT CONSISTENCY RULE - keeps facial
+          rendering close to the reference photos, regardless of book style):
+         - Avoid extreme, wide-open facial expressions in image_prompt
+           descriptions - e.g. do NOT write "shocked", "wide-eyed", "mouth wide
+           open", "surprised but delighted", "laughing joyfully", or similarly
+           exaggerated emotional language.
+         - Prefer milder, more subtle emotional wording instead - e.g.
+           "smiling", "curious", "pleased", "content", "focused", "quietly
+           excited" - even when the scene itself is dramatic or exciting. The
+           character's actions and the narration can carry the drama; the
+           facial expression described in image_prompt should stay
+           understated.
+         - This rule applies to every panel's image_prompt, regardless of
+           which book style is ultimately chosen for the illustration - the
+           story is generated before a style is selected downstream (this
+           endpoint never receives bookStyle), so this instruction cannot be
+           tailored per style here even if it turns out only some styles are
+           actually affected.
+      11. COVER SCENE (STRICT SEPARATION RULE - for the book cover illustration):
          - Write a "cover_scene": exactly ONE sentence, in ENGLISH, describing a specific,
            iconic moment or pose that is genuinely representative of the story you just
            wrote in the panels array above - not a generic, unrelated action pose.

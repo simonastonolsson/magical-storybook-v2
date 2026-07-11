@@ -113,6 +113,12 @@ export async function POST(request: Request) {
     const finalOutfit = charOutfit ? "wearing " + charOutfit : defaultOutfit;
     const characterAnchor = (triggerWord || 'TOK') + ', ' + (charDesc || 'a person') + ', ' + finalOutfit;
 
+    // Verifies the outfit-lock fix: charOutfit received here should now be
+    // the same text story/route.ts used to build Gemini's signatureOutfit,
+    // so the scene text and this lock sentence no longer contradict each
+    // other. Log both so a real test run can confirm they match.
+    console.log("Outfit check | charOutfit received: " + JSON.stringify(charOutfit) + " | finalOutfit injected into outfit lock: " + JSON.stringify(finalOutfit));
+
     const styleKey = bookStyle || 'digital_painting';
     const style = STYLE_PROMPTS[styleKey] || STYLE_PROMPTS['digital_painting'];
 
@@ -178,6 +184,15 @@ export async function POST(request: Request) {
 
     const sceneHasIntenseLighting = intenseLightingKeywords.test(cleanedPrompt);
     const qualityBoost = sceneHasIntenseLighting ? style.qualityBoostNoLighting : style.qualityBoost;
+
+    // Read-only diagnostic for the "medium close-up shot" vs "waist-up...
+    // medium shot" framing observation - no behavior change. Gemini picks
+    // this phrase freely per panel from CAMERA FRAMING RULE's menu in
+    // story/route.ts; nothing in this file selects or generates it. Logging
+    // which phrase(s) actually landed in this panel's own text so a real
+    // test run can be correlated against how each panel actually rendered.
+    const framingPhrasesFound = (cleanedPrompt.match(/medium close-up|waist-up[a-z ,-]*(medium )?shot|three-quarter face view|wide angle|shot from a distance|establishing shot/gi) || []);
+    console.log("Framing check | Phrases found in this panel's prompt: " + JSON.stringify(framingPhrasesFound));
 
     // Experiment J: trigger word + core identity moved to the very front of the
     // prompt (previously buried after the framing sentence and the entire

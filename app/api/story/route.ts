@@ -12,7 +12,8 @@ export async function POST(req: Request) {
       secondaryName,
       secondaryTrigger,
       secondaryTriggerWord,
-      pageCount
+      pageCount,
+      charOutfit
     } = await req.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -30,9 +31,18 @@ export async function POST(req: Request) {
                     desc.toLowerCase().includes("child") ||
                     desc.toLowerCase().includes("baby");
 
-    const signatureOutfit = isChild
-      ? "wearing his signature cozy yellow raincoat and blue denim jeans"
-      : "wearing his signature classic navy blue sweater and dark grey trousers";
+    // Single source of truth for outfit: previously this was a hardcoded
+    // isChild-based default, completely disconnected from whatever outfit
+    // the user actually picked in the wizard (charOutfit/customOutfit in
+    // app/skapa/page.tsx) - Gemini would invent its own clothing description
+    // here, which then contradicted the OUTFIT LOCKING sentence built from
+    // the real charOutfit in generate-image/route.ts. Now charOutfit (sent
+    // from the client) is used directly when provided, so both the story
+    // prompt and the image-generation outfit lock reference the same text.
+    const defaultOutfit = isChild
+      ? "cozy yellow raincoat and blue denim jeans"
+      : "classic navy blue sweater and dark grey trousers";
+    const signatureOutfit = "wearing his signature " + (charOutfit || defaultOutfit);
 
     const companionInstruction = secondaryName && secondaryTrigger && secondaryTriggerWord
       ? `There is also a companion in the story: ${secondaryTrigger}.

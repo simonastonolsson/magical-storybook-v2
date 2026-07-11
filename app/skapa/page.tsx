@@ -545,7 +545,8 @@ export default function Page() {
           secondaryName: companionName || null,
           secondaryTrigger: secondaryDescription || null,
           secondaryTriggerWord: useCustomCompanionAI ? companionTriggerWord : null,
-          pageCount
+          pageCount,
+          charOutfit: customOutfit || charOutfit || null
         }),
       });
       if (!response.ok) throw new Error('Server error');

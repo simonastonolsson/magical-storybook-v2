@@ -22,7 +22,7 @@ const https = require('https');
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
 // ---- CONFIG: fill these in with real values before running ----
-const trainedModelId = 'REPLACE_WITH_MODEL_PATH'; // e.g. simonastonolsson/comic-hero-XXXX:versionhash
+const trainedModelId = 'simonastonolsson/comic-hero-1783597472132:73d6553ff233ac7ed4c0ac21f918c3223bc6b1a7db3b1b936f90edf689345b1e'; // Bobban's confirmed model_path (from the earlier "Bobban" training rescue)
 const triggerWord = 'BOBBANTOK';
 const charDesc = 'a young boy';
 const charOutfit = 'football kit, jersey and shorts'; // exact text this book actually used

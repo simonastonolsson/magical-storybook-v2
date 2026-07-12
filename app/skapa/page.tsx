@@ -446,8 +446,13 @@ export default function Page() {
   // rule says gets added automatically before cover_scene - the character's
   // name/identity is established separately via the IDENTITY LOCK paragraph
   // in generate-image/route.ts, so it isn't repeated here too.
+  // "title-ready framing with clear space at top and bottom for text" was
+  // removed here - it was directly telling Gemini to reserve space "for
+  // text", which invited it to draw its own title into the image (visible
+  // as a second, baked-in title on top of the app's own HTML overlay). The
+  // title is only ever meant to be the HTML overlay in BookCoverPage.
   const buildCoverPrompt = (title: string, coverScene: string) =>
-    "Comic book cover art, dramatic graphic novel cover illustration, the character " + (coverScene || "in a dynamic heroic action pose, mid-motion, dramatic angle") + ", waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
+    "Comic book cover art, dramatic graphic novel cover illustration, the character " + (coverScene || "in a dynamic heroic action pose, mid-motion, dramatic angle") + ", waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, bold attention-grabbing cover illustration. Do NOT include any text, letters, words, titles, logos, or writing anywhere in the image - the artwork must be completely free of any text or lettering.";
 
   const generateCoverImage = async (comicData: any, baseSeed: number) => {
     setIsGeneratingCover(true);

@@ -99,12 +99,12 @@ async function fetchReferenceImageAsBase64(url: string): Promise<string> {
 
 export async function POST(request: Request) {
   try {
-    const { prompt, referenceImageUrl, charDesc, charOutfit, bookStyle, isCover, companionReferenceImageUrl, companionName } = await request.json();
+    const { prompt, referenceImageUrls, charDesc, charOutfit, bookStyle, isCover, companionReferenceImageUrl, companionName } = await request.json();
 
-    console.log("generate-image request body:", { prompt, referenceImageUrl, charDesc, charOutfit, bookStyle, companionReferenceImageUrl, companionName });
+    console.log("generate-image request body:", { prompt, referenceImageUrls, charDesc, charOutfit, bookStyle, companionReferenceImageUrl, companionName });
 
-    if (!referenceImageUrl) {
-      return NextResponse.json({ error: 'Missing referenceImageUrl' }, { status: 400 });
+    if (!Array.isArray(referenceImageUrls) || referenceImageUrls.length === 0) {
+      return NextResponse.json({ error: 'Missing referenceImageUrls' }, { status: 400 });
     }
     if (!GEMINI_API_KEY) {
       return NextResponse.json({ error: 'Missing GEMINI_API_KEY' }, { status: 500 });
@@ -205,11 +205,18 @@ export async function POST(request: Request) {
 
     console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | companion reference image included: " + !!companionReferenceImageUrl + " | Prompt: " + finalPrompt);
 
-    const referenceImageBase64 = await fetchReferenceImageAsBase64(referenceImageUrl);
+    // Multiple reference photos of the main character all go in as separate
+    // inline_data parts in the same request (confirmed via earlier research:
+    // Gemini accepts up to 14 images per request) - more angles of the same
+    // face should only help identity preservation, same reasoning as why the
+    // wizard now collects 5-8 photos instead of just one.
+    const referenceImagesBase64 = await Promise.all(
+      referenceImageUrls.map((url: string) => fetchReferenceImageAsBase64(url))
+    );
 
     const contentParts: any[] = [
       { text: finalPrompt },
-      { inline_data: { mime_type: 'image/jpeg', data: referenceImageBase64 } },
+      ...referenceImagesBase64.map((data) => ({ inline_data: { mime_type: 'image/jpeg', data } })),
     ];
 
     if (companionReferenceImageUrl) {

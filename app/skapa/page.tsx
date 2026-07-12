@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, forwardRef } from 'react';
-import JSZip from 'jszip';
 import HTMLFlipBook from 'react-pageflip';
 import { signOut } from '@/app/auth/actions';
 import type { UserModel } from '@/lib/models';
@@ -161,10 +160,9 @@ export default function Page() {
   const [pageCount, setPageCount] = useState<number>(8);
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isTraining, setIsTraining] = useState(false);
-  const [trainingStatus, setTrainingStatus] = useState('');
-  const [trainedModelId, setTrainedModelId] = useState<string | null>(null);
-  const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [isSavingReferencePhotos, setIsSavingReferencePhotos] = useState(false);
+  const [referencePhotosStatus, setReferencePhotosStatus] = useState('');
+  const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
   const [savedModelDbId, setSavedModelDbId] = useState<string | null>(null);
   const [charDescSaveStatus, setCharDescSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savedCharacters, setSavedCharacters] = useState<UserModel[]>([]);
@@ -172,7 +170,6 @@ export default function Page() {
 
   const [charName, setCharacterName] = useState('');
   const [charDesc, setCharacterDescription] = useState('an adult man');
-  const [charTrigger, setCharacterTrigger] = useState('TOK');
   const [charOutfit, setCharOutfit] = useState('');
   const [customOutfit, setCustomOutfit] = useState('');
   const [bookStyle, setBookStyle] = useState('digital_painting');
@@ -209,18 +206,12 @@ export default function Page() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    const cleanName = charName.replace(/[^a-zA-Z]/g, "").toUpperCase();
-    setCharacterTrigger(cleanName ? cleanName + 'TOK' : 'TOK');
-  }, [charName]);
-
   const selectCharacter = (model: UserModel) => {
     setSavedModelDbId(model.id);
-    setTrainedModelId(model.model_path);
-    setReferenceImageUrl(model.reference_image_url);
+    setReferenceImageUrls(model.reference_image_url ? [model.reference_image_url] : []);
     setCharacterName(model.model_name);
     setCharacterDescription(model.char_desc || 'an adult man');
-    setTrainingStatus('AI-modell hittad och redo!');
+    setReferencePhotosStatus('Karaktär hittad och redo!');
     setShowCharacterPicker(false);
   };
 
@@ -230,19 +221,17 @@ export default function Page() {
     setSavedCharacters(prev => prev.filter(m => m.id !== id));
     if (savedModelDbId === id) {
       setSavedModelDbId(null);
-      setTrainedModelId(null);
-      setReferenceImageUrl(null);
-      setTrainingStatus('');
+      setReferenceImageUrls([]);
+      setReferencePhotosStatus('');
     }
   };
 
-  const handleTrainNewCharacterKeepExisting = () => {
+  const handleAddNewCharacter = () => {
     setSavedModelDbId(null);
-    setTrainedModelId(null);
-    setReferenceImageUrl(null);
+    setReferenceImageUrls([]);
     setCharacterName('');
     setCharacterDescription('an adult man');
-    setTrainingStatus('');
+    setReferencePhotosStatus('');
     setSelectedFiles([]);
   };
 
@@ -251,17 +240,12 @@ export default function Page() {
       try {
         const res = await fetch('/api/user-models');
         if (!res.ok) return;
-        const { models, pendingTrainings } = await res.json();
+        const { models } = await res.json();
         setSavedCharacters(models || []);
         if (models?.length === 1) {
           selectCharacter(models[0]);
         } else if (models?.length > 1) {
           setShowCharacterPicker(true);
-        }
-        if (pendingTrainings) {
-          for (const pending of pendingTrainings) {
-            resumePendingTraining(pending);
-          }
         }
       } catch (err) {
         console.error('Failed to load saved models', err);
@@ -279,7 +263,14 @@ export default function Page() {
   }, []);
 
   const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setSelectedFiles(Array.from(e.target.files));
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    if (files.length > 8) {
+      alert('Max 8 foton - de första 8 används.');
+      setSelectedFiles(files.slice(0, 8));
+    } else {
+      setSelectedFiles(files);
+    }
   };
 
   const handleCharDescChange = async (newDesc: string) => {
@@ -335,114 +326,30 @@ export default function Page() {
     return data.url;
   };
 
-  // Polls /api/check-training every 15s until the training reaches a final
-  // state. check-training itself is now the source of truth: for
-  // main-character trainings (characterInfo passed to startTrainingJob) it
-  // finalizes the pending_trainings row and creates the user_models row
-  // server-side on success, so this resolves with that already-created
-  // model (if any) instead of the caller having to save it separately -
-  // that's what lets a training survive the tab closing/reloading.
-  const pollTrainingUntilDone = (trainingId: string, onStatusChange: (s: string) => void): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      const checkInterval = setInterval(async () => {
-        try {
-          const checkRes = await fetch('/api/check-training?id=' + trainingId);
-          const checkData = await checkRes.json();
-          if (checkData.status === 'succeeded') { clearInterval(checkInterval); resolve(checkData); }
-          else if (checkData.status === 'failed' || checkData.status === 'canceled') { clearInterval(checkInterval); reject(new Error(checkData.error || 'Training failed')); }
-          else { onStatusChange('Tränar... (' + checkData.status + ')'); }
-        } catch (err) { clearInterval(checkInterval); reject(err); }
-      }, 15000);
-    });
-  };
-
-  const startTrainingJob = async (
-    files: File[],
-    onStatusChange: (s: string) => void,
-    triggerWord: string,
-    characterInfo?: { modelName: string; charDesc: string; referenceImageUrl: string }
-  ): Promise<any> => {
-    onStatusChange('Packar bilderna...');
-    const zip = new JSZip();
-    for (let i = 0; i < files.length; i++) {
-      const resizedBlob = await resizeImage(files[i]);
-      zip.file('image_' + i + '.jpg', resizedBlob);
-    }
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const sizeMB = (zipBlob.size / 1024 / 1024).toFixed(2);
-    onStatusChange('Laddar upp (' + sizeMB + ' MB)...');
-    const formData = new FormData();
-    formData.append('file', zipBlob, 'training_data.zip');
-    const uploadRes = await fetch('/api/upload-training-data', { method: 'POST', body: formData });
-    if (!uploadRes.ok) throw new Error('Upload failed');
-    const { url: rawZipUrl } = await uploadRes.json();
-    onStatusChange('Startar AI-träning... (5-10 min)');
-    const trainRes = await fetch('/api/train-model', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        zipUrl: rawZipUrl,
-        triggerWord,
-        ...(characterInfo ? {
-          characterName: characterInfo.modelName,
-          charDesc: characterInfo.charDesc,
-          referenceImageUrl: characterInfo.referenceImageUrl,
-        } : {}),
-      }),
-    });
-    if (!trainRes.ok) throw new Error('Training failed to start');
-    const { trainingId } = await trainRes.json();
-    onStatusChange('AI:n tränas... Stäng inte sidan.');
-    return pollTrainingUntilDone(trainingId, onStatusChange);
-  };
-
-  // Picks up a training that was still running the last time this account
-  // was seen (tab closed/reloaded mid-training) - see pending_trainings and
-  // check-training/route.ts. By the time our own poll here observes
-  // "succeeded", the server has already created the user_models row, so
-  // this never requires the customer to do anything.
-  const resumePendingTraining = async (pending: { training_id: string; model_name: string }) => {
-    try {
-      setTrainingStatus('Fortsätter en pågående träning ("' + pending.model_name + '")...');
-      const checkData = await pollTrainingUntilDone(pending.training_id, setTrainingStatus);
-      if (checkData.model) {
-        setSavedCharacters(prev => [checkData.model, ...prev]);
-        setShowCharacterPicker(true);
-        setTrainingStatus('Klart! "' + pending.model_name + '" är redo och tillagd bland dina karaktärer.');
-      }
-    } catch (err) {
-      console.error('Resumed training failed', err);
-      alert('Träningen för "' + pending.model_name + '" misslyckades medan du var borta. Försök träna igen.');
-    }
-  };
-
-  const handleStartTraining = async () => {
-    if (selectedFiles.length < 5) { alert("Ladda upp minst 5 bilder!"); return; }
+  // Gemini needs no training - just the reference photos themselves, saved
+  // directly via the same /api/upload-reference path used for a single photo
+  // before. Uploads run in parallel since each is an independent request.
+  // Not persisted to user_models here (session-only for now) - this new
+  // character is fully usable for generating this book, but won't show up
+  // in the saved-character picker on a future visit until that persistence
+  // path is rebuilt without the LoRA-era model_path/trigger_word fields.
+  const handleSaveReferencePhotos = async () => {
+    if (selectedFiles.length < 5) { alert('Ladda upp minst 5 foton!'); return; }
     const trimmedName = charName.trim();
     if (savedCharacters.some(m => m.model_name.trim().toLowerCase() === trimmedName.toLowerCase())) {
       alert('Du har redan en karaktär som heter ' + trimmedName + ', välj ett annat namn.');
       return;
     }
-    setIsTraining(true);
+    setIsSavingReferencePhotos(true);
     try {
-      setTrainingStatus('Sparar referensfoto...');
-      const refUrl = await uploadReferenceImageToBlob(selectedFiles[0]);
-      setReferenceImageUrl(refUrl);
-      const checkData = await startTrainingJob(selectedFiles, setTrainingStatus, charTrigger, {
-        modelName: charName || 'Min karaktär',
-        charDesc,
-        referenceImageUrl: refUrl,
-      });
-      setTrainedModelId(checkData.fullPath);
-      if (checkData.model) {
-        setSavedModelDbId(checkData.model.id);
-        setSavedCharacters(prev => [checkData.model, ...prev]);
-      }
-      setTrainingStatus('Klart! Din AI-karaktär är redo.');
+      setReferencePhotosStatus('Sparar foton...');
+      const urls = await Promise.all(selectedFiles.map((file) => uploadReferenceImageToBlob(file)));
+      setReferenceImageUrls(urls);
+      setReferencePhotosStatus('Klart! Din karaktär är redo.');
     } catch (err) {
       console.error(err);
-      setTrainingStatus('Fel vid träning. Försök igen.');
-    } finally { setIsTraining(false); }
+      setReferencePhotosStatus('Fel vid sparande. Försök igen.');
+    } finally { setIsSavingReferencePhotos(false); }
   };
 
   // Gemini has no LoRA/training concept, so the companion's photo just needs
@@ -489,12 +396,11 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: panel.image_prompt,
-            trainedModelId,
             charDesc,
             charName,
             charOutfit: customOutfit || charOutfit,
             bookStyle,
-            referenceImageUrl,
+            referenceImageUrls,
             companionReferenceImageUrl: companionReferenceImageUrlForPrompt(panel.image_prompt),
             companionName: companionName || null,
             seed: baseSeed + i + 1,
@@ -527,12 +433,11 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: coverPrompt,
-          trainedModelId,
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
           bookStyle,
-          referenceImageUrl,
+          referenceImageUrls,
           companionReferenceImageUrl: companionReferenceImageUrlForPrompt(coverPrompt),
           companionName: companionName || null,
           seed: baseSeed,
@@ -591,7 +496,7 @@ export default function Page() {
 
   const handleRegeneratePanel = async (panelNumber: number, originalPrompt: string) => {
     const instruction = customPrompts[panelNumber];
-    if (!instruction?.trim() || !trainedModelId) return;
+    if (!instruction?.trim() || referenceImageUrls.length === 0) return;
     setPanelsLoading(prev => ({ ...prev, [panelNumber]: true }));
     try {
       const refineRes = await fetch('/api/refine-prompt', {
@@ -606,12 +511,11 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: refinedPrompt,
-          trainedModelId,
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
           bookStyle,
-          referenceImageUrl,
+          referenceImageUrls,
           companionReferenceImageUrl: companionReferenceImageUrlForPrompt(refinedPrompt),
           companionName: companionName || null,
           isCover: false
@@ -635,7 +539,7 @@ export default function Page() {
   // parallel state just for the cover.
   const handleRegenerateCover = async () => {
     const instruction = customPrompts[0];
-    if (!instruction?.trim() || !trainedModelId || !comic) return;
+    if (!instruction?.trim() || referenceImageUrls.length === 0 || !comic) return;
     setPanelsLoading(prev => ({ ...prev, 0: true }));
     try {
       const refineRes = await fetch('/api/refine-prompt', {
@@ -650,12 +554,11 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: refinedPrompt,
-          trainedModelId,
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
           bookStyle,
-          referenceImageUrl,
+          referenceImageUrls,
           companionReferenceImageUrl: companionReferenceImageUrlForPrompt(refinedPrompt),
           companionName: companionName || null,
           isCover: true
@@ -975,10 +878,10 @@ export default function Page() {
               <div className="wiz-title">Vem är stjärnan?</div>
               <p className="wiz-sub">Berätta vem boken ska handla om och ladda upp foton så att AI:n kan skapa din unika karaktär.</p>
 
-              {showCharacterPicker && !trainedModelId && (
+              {showCharacterPicker && referenceImageUrls.length === 0 && (
                 <div className="wiz-card">
                   <label className="wiz-label">Välj karaktär</label>
-                  <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Du har flera sparade karaktärer - välj en att använda, eller träna en ny.</p>
+                  <p style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.5'}}>Du har flera sparade karaktärer - välj en att använda, eller lägg till en ny.</p>
                   <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
                     {savedCharacters.map((m) => (
                       <div key={m.id} style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.9rem', border:'1.5px solid #e5e0d8', borderRadius:'12px'}}>
@@ -992,12 +895,12 @@ export default function Page() {
                     ))}
                   </div>
                   <button className="wiz-upload-btn" style={{marginTop:'1rem'}} onClick={() => setShowCharacterPicker(false)}>
-                    + Träna en ny karaktär istället
+                    + Lägg till en ny karaktär istället
                   </button>
                 </div>
               )}
 
-              {(!showCharacterPicker || trainedModelId) && (
+              {(!showCharacterPicker || referenceImageUrls.length > 0) && (
               <>
               <div className="wiz-card">
                 <div className="wiz-grid-2" style={{marginBottom:'1rem'}}>
@@ -1065,9 +968,9 @@ export default function Page() {
               </div>
 
               <div className="wiz-card">
-                <label className="wiz-label">Foton (minst 5)</label>
+                <label className="wiz-label">Foton (5-8 st)</label>
                 <ul style={{fontSize:'0.85rem', color:'#6b7280', marginBottom:'1rem', lineHeight:'1.6', paddingLeft:'1.1rem'}}>
-                  <li>Helst 10-15 bilder för bästa likhet (minst 5 krävs)</li>
+                  <li>Ladda upp 5-8 foton av {charName || "karaktären"} från olika vinklar för bästa resultat</li>
                   <li>Variera vinklar: rakt framifrån, tre-kvarts, gärna någon lätt uppifrån/nedifrån</li>
                   <li>Bra, jämn belysning - undvik starka skuggor och bakljus</li>
                   <li>Inga solglasögon, hattar eller annat som döljer ansiktet</li>
@@ -1076,35 +979,34 @@ export default function Page() {
                 </ul>
                 <input type="file" multiple ref={fileInputRef} onChange={handleFileSelection} className="hidden" accept="image/*" style={{display:'none'}} />
                 <div style={{display:'flex', alignItems:'center', gap:'1rem', flexWrap:'wrap'}}>
-                  <button className="wiz-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={isTraining || trainedModelId !== null}>
+                  <button className="wiz-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={isSavingReferencePhotos || referenceImageUrls.length > 0}>
                     📸 Välj foton
                   </button>
                   {selectedFiles.length > 0 && <span style={{fontSize:'0.85rem', color:'#6b7280'}}>{selectedFiles.length} foton valda</span>}
                 </div>
-                {selectedFiles.length >= 5 && !trainedModelId && (
-                  <button className="wiz-train-btn" onClick={handleStartTraining} disabled={isTraining}>
-                    {isTraining ? 'Tränar...' : 'Starta AI-träning'}
+                {selectedFiles.length >= 5 && referenceImageUrls.length === 0 && (
+                  <button className="wiz-train-btn" onClick={handleSaveReferencePhotos} disabled={isSavingReferencePhotos}>
+                    {isSavingReferencePhotos ? 'Sparar...' : 'Spara foton'}
                   </button>
                 )}
-                {trainingStatus && (
-                  <div className={'wiz-status' + (trainedModelId ? ' wiz-success' : '')}>{trainingStatus}</div>
+                {referencePhotosStatus && (
+                  <div className={'wiz-status' + (referenceImageUrls.length > 0 ? ' wiz-success' : '')}>{referencePhotosStatus}</div>
                 )}
-                {trainedModelId && (
-                  <button className="wiz-upload-btn" onClick={handleTrainNewCharacterKeepExisting}>
-                    + Träna en helt ny karaktär (behåll {charName})
+                {referenceImageUrls.length > 0 && (
+                  <button className="wiz-upload-btn" onClick={handleAddNewCharacter}>
+                    + Lägg till en helt ny karaktär (behåll {charName})
                   </button>
                 )}
-                {trainedModelId && (
+                {referenceImageUrls.length > 0 && (
                   <button className="wiz-delete-link" onClick={() => {
                     if (savedModelDbId) {
                       handleDeleteCharacter(savedModelDbId);
                     } else {
-                      setTrainedModelId(null);
-                      setReferenceImageUrl(null);
-                      setTrainingStatus('');
+                      setReferenceImageUrls([]);
+                      setReferencePhotosStatus('');
                     }
                   }}>
-                    Ta bort och träna ny karaktär
+                    Ta bort och lägg till ny karaktär
                   </button>
                 )}
               </div>
@@ -1200,7 +1102,7 @@ export default function Page() {
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Stil</span><span className="wiz-summary-val">{{digital_painting:'Digital Painting',ligne_claire:'Ligne Claire',american_comic:'Amerikansk serie',watercolor:'Akvarell',noir:'Noir',pop_art:'Pop Art'}[bookStyle]}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Följeslagare</span><span className="wiz-summary-val">{companionType === 'none' ? 'Ingen' : (companionName || companionType)}</span></div>
                 <div className="wiz-summary-row"><span className="wiz-summary-key">Sidor</span><span className="wiz-summary-val">{pageCount} sidor</span></div>
-                <div className="wiz-summary-row"><span className="wiz-summary-key">AI-modell</span><span className="wiz-summary-val">{trainedModelId ? 'Redo' : 'Saknas'}</span></div>
+                <div className="wiz-summary-row"><span className="wiz-summary-key">Referensfoton</span><span className="wiz-summary-val">{referenceImageUrls.length > 0 ? 'Redo' : 'Saknas'}</span></div>
               </div>
 
               <div className="wiz-card">
@@ -1368,12 +1270,12 @@ export default function Page() {
             <a href="/" style={{fontSize:'0.9rem', color:'#6b7280', textDecoration:'none'}}>Tillbaka till start</a>
           )}
           {step < 4 && (
-            <button className="wiz-btn-next" onClick={() => setStep(s => s + 1)} disabled={step === 1 && !trainedModelId}>
-              {step === 1 && !trainedModelId ? 'Träna AI först' : 'Nästa steg'}
+            <button className="wiz-btn-next" onClick={() => setStep(s => s + 1)} disabled={step === 1 && referenceImageUrls.length === 0}>
+              {step === 1 && referenceImageUrls.length === 0 ? 'Ladda upp foton först' : 'Nästa steg'}
             </button>
           )}
           {step === 4 && (
-            <button className="wiz-btn-generate" onClick={handleCreateStory} disabled={isLoadingScript || !trainedModelId || !memory.trim()}>
+            <button className="wiz-btn-generate" onClick={handleCreateStory} disabled={isLoadingScript || referenceImageUrls.length === 0 || !memory.trim()}>
               {isLoadingScript ? 'Skapar...' : 'Skapa boken!'}
             </button>
           )}

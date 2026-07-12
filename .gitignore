@@ -17,6 +17,10 @@
 *.pem
 npm-debug.log*
 
+# one-off script scratch space (scripts/extract-and-upload-lora.js) -
+# large downloaded/extracted binaries, never meant to be committed
+/.lora-extract-tmp
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

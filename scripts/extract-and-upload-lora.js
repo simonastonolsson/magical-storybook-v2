@@ -11,6 +11,13 @@
 // and prints the resulting public URL to paste into
 // scripts/ip-adapter-test.js's loraWeightsUrl.
 //
+// Uploads via Supabase Storage's TUS (resumable upload) protocol instead
+// of the plain storage.upload() call: confirmed the Supabase free plan
+// enforces a hard 50MB limit per file on standard uploads (not a
+// configurable bucket setting - "Restrict file size" was already off), and
+// lora.safetensors is ~164MB. TUS uploads in 6MB chunks instead, which
+// Supabase's free plan supports.
+//
 // PREREQUISITE: create a public bucket named "lora-weights" in the Supabase
 // dashboard (Storage -> New bucket -> name it exactly "lora-weights",
 // toggle "Public bucket" on) if it doesn't already exist - this script
@@ -28,6 +35,7 @@ const https = require('https');
 const path = require('path');
 const { execSync } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
+const tus = require('tus-js-client');
 
 const TAR_URL = 'https://replicate.delivery/xezq/1XGMqkf1tnzUQSdLR54GvkBkTaUMW6erLWhEge9Qf05pXPdbB/trained_model.tar';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xaaduajcznqctcuymrzb.supabase.co';
@@ -61,43 +69,95 @@ async function main() {
 
   fs.mkdirSync(workDir, { recursive: true });
 
-  console.log('Downloading ' + TAR_URL + ' ...');
-  await downloadFile(TAR_URL, tarPath);
-  const tarSize = fs.statSync(tarPath).size;
-  console.log('Downloaded trained_model.tar: ' + tarSize + ' bytes');
+  try {
+    console.log('Downloading ' + TAR_URL + ' ...');
+    await downloadFile(TAR_URL, tarPath);
+    const tarSize = fs.statSync(tarPath).size;
+    console.log('Downloaded trained_model.tar: ' + tarSize + ' bytes');
 
-  console.log('Extracting ' + extractedRelPath + ' ...');
-  execSync('tar -xf ' + JSON.stringify(tarPath) + ' -C ' + JSON.stringify(workDir) + ' ' + JSON.stringify(extractedRelPath));
+    console.log('Extracting ' + extractedRelPath + ' ...');
+    execSync('tar -xf ' + JSON.stringify(tarPath) + ' -C ' + JSON.stringify(workDir) + ' ' + JSON.stringify(extractedRelPath));
 
-  const extractedPath = path.join(workDir, extractedRelPath);
-  const fileBuffer = fs.readFileSync(extractedPath);
-  console.log('Extracted lora.safetensors: ' + fileBuffer.length + ' bytes (' + (fileBuffer.length / 1024 / 1024).toFixed(1) + ' MB)');
+    const extractedPath = path.join(workDir, extractedRelPath);
+    const fileBuffer = fs.readFileSync(extractedPath);
+    console.log('Extracted lora.safetensors: ' + fileBuffer.length + ' bytes (' + (fileBuffer.length / 1024 / 1024).toFixed(1) + ' MB)');
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  const uploadPath = 'bobban/lora-' + Date.now() + '.safetensors';
+    const uploadPath = 'bobban/lora-' + Date.now() + '.safetensors';
 
-  console.log('Uploading to Supabase Storage bucket "' + BUCKET + '" at "' + uploadPath + '" ...');
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(uploadPath, fileBuffer, { contentType: 'application/octet-stream', upsert: false });
+    // Direct storage subdomain, recommended by Supabase for TUS uploads
+    // (faster than routing through the general project API domain).
+    const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+    const tusEndpoint = 'https://' + projectRef + '.storage.supabase.co/storage/v1/upload/resumable';
 
-  if (uploadError) {
-    console.error('Upload failed: ' + uploadError.message);
-    console.error('If this says the bucket doesn\'t exist, create a public bucket named "' + BUCKET + '" in the Supabase dashboard first.');
-    process.exit(1);
+    console.log('Uploading to Supabase Storage bucket "' + BUCKET + '" at "' + uploadPath + '" via TUS (' + tusEndpoint + ') ...');
+
+    await new Promise((resolve, reject) => {
+      const upload = new tus.Upload(fileBuffer, {
+        endpoint: tusEndpoint,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          authorization: 'Bearer ' + SERVICE_ROLE_KEY,
+          apikey: SERVICE_ROLE_KEY,
+          'x-upsert': 'false',
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: {
+          bucketName: BUCKET,
+          objectName: uploadPath,
+          contentType: 'application/octet-stream',
+          cacheControl: '3600',
+        },
+        chunkSize: 6 * 1024 * 1024, // fixed by Supabase's TUS implementation - do not change
+        onError: (err) => {
+          const body = err && err.originalResponse && typeof err.originalResponse._body === 'string'
+            ? err.originalResponse._body
+            : null;
+          console.error('\nUpload failed: ' + err.message);
+          if (body) console.error('Server response: ' + body);
+          console.error('If this mentions the bucket, create a public bucket named "' + BUCKET + '" in the Supabase dashboard first.');
+          reject(err);
+        },
+        onProgress: (bytesUploaded, bytesTotal) => {
+          const pct = ((bytesUploaded / bytesTotal) * 100).toFixed(1);
+          process.stdout.write('\r  Uploading... ' + pct + '% (' + bytesUploaded + ' / ' + bytesTotal + ' bytes)');
+        },
+        onSuccess: () => {
+          process.stdout.write('\n');
+          resolve();
+        },
+      });
+
+      upload.findPreviousUploads().then((previousUploads) => {
+        if (previousUploads.length) {
+          console.log('Resuming a previous incomplete upload...');
+          upload.resumeFromPreviousUpload(previousUploads[0]);
+        }
+        upload.start();
+      });
+    });
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(uploadPath);
+
+    console.log('\nDone. Public URL:');
+    console.log(publicUrl);
+    console.log('\nPaste this into scripts/ip-adapter-test.js as loraWeightsUrl.');
+  } finally {
+    // Always clean up the local working directory, whether the upload
+    // succeeded or failed - it can be multiple hundred MB (tar + extracted
+    // file) and should never linger or get committed by accident.
+    fs.rmSync(workDir, { recursive: true, force: true });
   }
-
-  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(uploadPath);
-
-  console.log('\nDone. Public URL:');
-  console.log(publicUrl);
-  console.log('\nPaste this into scripts/ip-adapter-test.js as loraWeightsUrl.');
-
-  // Clean up the local working directory - the file now lives in Supabase.
-  fs.rmSync(workDir, { recursive: true, force: true });
 }
 
 main().catch((err) => {
-  console.error(err);
+  // onError above already printed a clean message for TUS-specific
+  // failures; avoid dumping the whole (very verbose) tus-js-client error
+  // object again here for those. Anything else (download/extract errors)
+  // still gets logged in full.
+  if (!err || !err.originalResponse) {
+    console.error(err);
+  }
   process.exit(1);
 });

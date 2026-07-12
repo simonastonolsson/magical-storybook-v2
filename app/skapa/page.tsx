@@ -208,7 +208,14 @@ export default function Page() {
 
   const selectCharacter = (model: UserModel) => {
     setSavedModelDbId(model.id);
-    setReferenceImageUrls(model.reference_image_url ? [model.reference_image_url] : []);
+    // Prefer the new array column (all originally-uploaded photos); fall
+    // back to the old singular column for any row from before the
+    // reference_image_urls migration/backfill.
+    setReferenceImageUrls(
+      model.reference_image_urls && model.reference_image_urls.length > 0
+        ? model.reference_image_urls
+        : (model.reference_image_url ? [model.reference_image_url] : [])
+    );
     setCharacterName(model.model_name);
     setCharacterDescription(model.char_desc || 'an adult man');
     setReferencePhotosStatus('Karaktär hittad och redo!');

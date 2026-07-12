@@ -63,11 +63,13 @@ export async function POST(request: Request) {
       user_id: user.id,
       model_name: body.model_name,
       char_desc: body.char_desc ?? null,
-      // The table only has room for a single reference_image_url (LoRA-era
-      // schema, not changed here per the "don't touch the DB yet" rule) -
-      // store the first of the possibly-several uploaded photos. All of them
-      // still get used for THIS session's generation regardless (see
-      // referenceImageUrls in app/skapa/page.tsx), just not all persisted.
+      // Primary source of truth going forward - all uploaded photos, not
+      // just one (see the reference_image_urls text[] migration).
+      reference_image_urls: body.reference_image_urls,
+      // Old singular column - kept populated defensively (same reasoning as
+      // model_path/trigger_word below: unknown whether it's NOT NULL, and
+      // it's harmless either way) even though nothing reads it back anymore
+      // now that selectCharacter reads reference_image_urls instead.
       reference_image_url: body.reference_image_urls[0],
       // model_path/trigger_word: LoRA-era NOT NULL-safe placeholders. These
       // columns are unused everywhere else in the app now - kept populated

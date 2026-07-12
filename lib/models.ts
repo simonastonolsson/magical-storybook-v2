@@ -6,6 +6,7 @@ export type UserModel = {
   trigger_word: string;
   char_desc: string | null;
   reference_image_url: string | null;
+  reference_image_urls: string[] | null;
   created_at: string;
 };
 

@@ -129,6 +129,7 @@ async function runFal(falInput, seed) {
     throw new Error('Submit failed: ' + submitRes.status + ' ' + (await submitRes.text()));
   }
   const submitData = await submitRes.json();
+  console.log('  Submit response: ' + JSON.stringify(submitData));
   const statusUrl = submitData.status_url;
   const responseUrl = submitData.response_url;
 
@@ -137,15 +138,28 @@ async function runFal(falInput, seed) {
     await sleep(3000);
     const statusRes = await fetch(statusUrl, { headers: { 'Authorization': 'Key ' + FAL_KEY } });
     const statusData = await statusRes.json();
+    console.log('  Status response: ' + JSON.stringify(statusData));
     if (statusData.status === 'COMPLETED') break;
     if (statusData.status === 'FAILED' || statusData.status === 'ERROR') {
       throw new Error('fal.ai request failed: ' + JSON.stringify(statusData));
     }
-    console.log('  ...status: ' + statusData.status);
   }
 
   const resultRes = await fetch(responseUrl, { headers: { 'Authorization': 'Key ' + FAL_KEY } });
-  const result = await resultRes.json();
+  const rawBody = await resultRes.text();
+  // Full raw response body, always - regardless of whether it looks like
+  // success or failure, so a shape we don't expect (e.g. an error field,
+  // or images nested somewhere other than result.images[0].url) is visible
+  // instead of silently producing "No image returned".
+  console.log('  Result response (HTTP ' + resultRes.status + '): ' + rawBody);
+
+  let result;
+  try {
+    result = JSON.parse(rawBody);
+  } catch (err) {
+    console.error('  Result body was not valid JSON: ' + err.message);
+    return null;
+  }
   return result?.images?.[0]?.url || null;
 }
 

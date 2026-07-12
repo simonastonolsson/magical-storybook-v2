@@ -77,10 +77,16 @@ const scenes = [
 ];
 
 function buildPrompt(sceneText) {
-  return 'Using the boy shown in the reference photo, generate a comic book panel illustration in a ' +
-    'digital painted illustration style, painterly art style, soft brush strokes, natural volumetric ' +
-    'lighting, cinematic composition. He is wearing his football kit (jersey and shorts). Keep his face, ' +
-    'hair, and skin tone consistent with the reference photo. Scene: ' + sceneText + '.';
+  // No "comic book panel illustration" framing here - a previous run showed
+  // Gemini taking that literally (black outlines, speech bubbles) instead of
+  // the intended digital-painting look.
+  return 'IDENTITY LOCK (CRITICAL, NOT OPTIONAL): This must be 100% recognizable as the exact same child ' +
+    'shown in the reference photo. Preserve all facial features, face shape, eye color, hair color and ' +
+    'texture, and skin tone EXACTLY as shown in the reference photo - this is critical, not optional. ' +
+    'Anyone who knows this child should immediately recognize them in the generated image.\n\n' +
+    'Style: digital painted illustration, painterly art style, soft brush strokes, natural volumetric ' +
+    'lighting, cinematic composition. He is wearing his football kit (jersey and shorts).\n\n' +
+    'Scene: ' + sceneText + '.';
 }
 
 function fetchAsBase64(url) {

@@ -89,6 +89,71 @@ function buildPrompt(sceneText) {
     'Scene: ' + sceneText + '.';
 }
 
+// Reads width/height straight out of the PNG file bytes (IHDR chunk: 8-byte
+// PNG signature, then a 4-byte chunk length, 4-byte "IHDR" type, then width
+// and height as big-endian uint32) instead of trusting any metadata the API
+// response might or might not include - this is the actual pixel size of
+// the file we're about to save and use, not a claim about it.
+function getPngDimensions(buffer) {
+  if (buffer.length < 24 || buffer.toString('ascii', 12, 16) !== 'IHDR') {
+    return null;
+  }
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+// JPEG has no fixed-offset header - dimensions live inside a SOF (Start Of
+// Frame) marker, found by walking the marker segments from byte 2 (right
+// after the 0xFFD8 SOI marker). Each segment is 0xFF + a marker byte, then
+// (for markers that carry data) a 2-byte big-endian length covering the
+// length field itself. SOF markers are 0xC0-0xCF, excluding 0xC4 (DHT),
+// 0xC8 (JPG, reserved/unused), and 0xCC (DAC) which are not actually SOF
+// markers despite being in that numeric range. Inside a SOF segment the
+// layout is: length(2) + precision(1) + height(2, BE) + width(2, BE).
+function getJpegDimensions(buffer) {
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+    return null;
+  }
+  let offset = 2;
+  while (offset + 9 <= buffer.length) {
+    if (buffer[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = buffer[offset + 1];
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) {
+      // SOI/EOI/RSTn carry no length field.
+      offset += 2;
+      continue;
+    }
+    const segmentLength = buffer.readUInt16BE(offset + 2);
+    const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) {
+      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+    }
+    offset += 2 + segmentLength;
+  }
+  return null;
+}
+
+// Tries the dimension reader matching the API's reported mimeType first (the
+// actual authority on what bytes we got), then falls back to trying both
+// formats in case the mimeType is missing or wrong - so this still reports
+// real dimensions instead of giving up if either turns out to be unreliable.
+function getImageDimensions(buffer, mimeType) {
+  const wantsPng = (mimeType || '').includes('png');
+  const wantsJpeg = (mimeType || '').includes('jpeg') || (mimeType || '').includes('jpg');
+  if (wantsPng) return getPngDimensions(buffer) || getJpegDimensions(buffer);
+  if (wantsJpeg) return getJpegDimensions(buffer) || getPngDimensions(buffer);
+  return getPngDimensions(buffer) || getJpegDimensions(buffer);
+}
+
+function extensionForMimeType(mimeType) {
+  if ((mimeType || '').includes('png')) return 'png';
+  if ((mimeType || '').includes('jpeg') || (mimeType || '').includes('jpg')) return 'jpg';
+  if ((mimeType || '').includes('webp')) return 'webp';
+  return 'bin'; // unknown format - still save it, just without pretending to know the extension
+}
+
 function fetchAsBase64(url) {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
@@ -104,7 +169,7 @@ function fetchAsBase64(url) {
   });
 }
 
-async function generateImage(prompt, referenceImageBase64, apiVersion, model) {
+async function generateImage(prompt, referenceImageBase64, apiVersion, model, imageConfig) {
   const url = 'https://generativelanguage.googleapis.com/' + apiVersion + '/models/' + model + ':generateContent';
   const body = {
     contents: [{
@@ -114,6 +179,14 @@ async function generateImage(prompt, referenceImageBase64, apiVersion, model) {
       ],
     }],
   };
+  // OPEN QUESTION THIS TEST NEEDS TO ANSWER: does this API accept a
+  // generationConfig.imageConfig.aspectRatio hint at all for this model, and
+  // if so does it actually change the returned pixel dimensions? Not
+  // confirmed yet - if the request is rejected, the caller's try/catch below
+  // will surface the real error body rather than this silently being wrong.
+  if (imageConfig) {
+    body.generationConfig = { imageConfig };
+  }
 
   const res = await fetch(url, {
     method: 'POST',
@@ -139,7 +212,12 @@ async function generateImage(prompt, referenceImageBase64, apiVersion, model) {
     return null;
   }
 
-  return inline.data; // base64
+  // Report the mimeType Gemini actually declares (camelCase per the official
+  // field name; snake_case inline_data kept as a fallback for symmetry with
+  // the inline/inline_data check above) instead of assuming it matches the
+  // .png filenames this script has been saving under - that assumption is
+  // exactly what caused "could not read PNG dimensions" last run.
+  return { data: inline.data, mimeType: inline.mimeType || inline.mime_type || null }; // data is base64
 }
 
 async function main() {
@@ -188,22 +266,67 @@ async function main() {
   const referenceImageBase64 = await fetchAsBase64(REFERENCE_IMAGE_URL);
   console.log('Reference image loaded (' + referenceImageBase64.length + ' base64 chars).');
 
+  // The book reader (app/skapa/page.tsx) renders every page/cover image with
+  // CSS object-fit: cover inside a fixed-aspect container, so it always
+  // crops to fill rather than requiring an exact pixel match - but the
+  // closer the source aspect ratio is to the container's, the less content
+  // gets cropped away. Current Replicate output is 1024x1152 (0.889 w/h,
+  // requested explicitly via width/height input fields). The book page
+  // container itself (BOOK_ASPECT in app/skapa/page.tsx) is 2:3 (0.667
+  // w/h) - so even the CURRENT pipeline doesn't exactly match and already
+  // relies on cover-crop. This test's job is just to find out (a) what
+  // Gemini returns by default, and (b) whether it can be pointed closer to
+  // portrait at all.
   for (const scene of scenes) {
     const prompt = buildPrompt(scene.text);
     console.log('\n=== ' + scene.name + ' ===');
     console.log('Prompt: ' + prompt);
 
     try {
-      const imageBase64 = await generateImage(prompt, referenceImageBase64, chosenApiVersion, chosenModel);
-      if (!imageBase64) {
+      const result = await generateImage(prompt, referenceImageBase64, chosenApiVersion, chosenModel);
+      if (!result) {
         console.error('No image returned for ' + scene.name);
         continue;
       }
-      const filename = 'test-nanobanana-' + scene.name + '.png';
-      fs.writeFileSync(filename, Buffer.from(imageBase64, 'base64'));
-      console.log('Saved ' + filename);
+      const buffer = Buffer.from(result.data, 'base64');
+      const dims = getImageDimensions(buffer, result.mimeType);
+      const filename = 'test-nanobanana-' + scene.name + '.' + extensionForMimeType(result.mimeType);
+      fs.writeFileSync(filename, buffer);
+      console.log('Saved ' + filename + ' (mimeType: ' + (result.mimeType || 'unknown') + (dims ? ', ' + dims.width + 'x' + dims.height + ', aspect ' + (dims.width / dims.height).toFixed(3) + ' w/h)' : ', could not read dimensions)'));
     } catch (err) {
       console.error('Failed for ' + scene.name + ': ' + err.message);
+    }
+  }
+
+  // Dedicated aspect-ratio-control test(s): reuse the 'calm' scene prompt but
+  // pass an explicit generationConfig.imageConfig.aspectRatio, to see whether
+  // Gemini actually honors it and how closely the result matches what the
+  // book reader needs. Confirmed in an earlier run: "3:4" produced 896x1200
+  // (aspect 0.747) - close to requested but not exact, and still off from
+  // the book page container's own BOOK_ASPECT of 2:3 (0.667 w/h, see
+  // app/skapa/page.tsx). "2:3" is tested here as the exact match instead of
+  // the nearest standard preset.
+  await runAspectRatioTest('2:3', referenceImageBase64, chosenApiVersion, chosenModel);
+  await runAspectRatioTest('3:4', referenceImageBase64, chosenApiVersion, chosenModel);
+
+  async function runAspectRatioTest(aspectRatio, refImageBase64, apiVersion, model) {
+    const label = aspectRatio.replace(':', '-');
+    console.log('\n=== aspect-ratio-control (requesting ' + aspectRatio + ' via generationConfig.imageConfig) ===');
+    try {
+      const calmPrompt = buildPrompt(scenes[0].text);
+      const result = await generateImage(calmPrompt, refImageBase64, apiVersion, model, { aspectRatio });
+      if (!result) {
+        console.error('No image returned for aspect-ratio-control test (' + aspectRatio + ')');
+        return;
+      }
+      const buffer = Buffer.from(result.data, 'base64');
+      const dims = getImageDimensions(buffer, result.mimeType);
+      const filename = 'test-nanobanana-aspect-' + label + '.' + extensionForMimeType(result.mimeType);
+      fs.writeFileSync(filename, buffer);
+      console.log('Saved ' + filename + ' (mimeType: ' + (result.mimeType || 'unknown') + (dims ? ', ' + dims.width + 'x' + dims.height + ', aspect ' + (dims.width / dims.height).toFixed(3) + ' w/h)' : ', could not read dimensions)'));
+      console.log('Compare this ratio to the default \'calm\' run above and to the other aspect-ratio-control run to judge fit against the 2:3 (0.667) book page container.');
+    } catch (err) {
+      console.error('Failed for aspect-ratio-control test (' + aspectRatio + '): ' + err.message);
     }
   }
 }

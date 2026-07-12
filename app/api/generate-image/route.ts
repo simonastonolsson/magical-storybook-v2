@@ -99,9 +99,9 @@ async function fetchReferenceImageAsBase64(url: string): Promise<string> {
 
 export async function POST(request: Request) {
   try {
-    const { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle, isCover } = await request.json();
+    const { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle, isCover, companionReferenceImageUrl, companionTriggerWord, companionName } = await request.json();
 
-    console.log("generate-image request body:", { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle });
+    console.log("generate-image request body:", { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle, companionReferenceImageUrl, companionTriggerWord, companionName });
 
     if (!referenceImageUrl) {
       return NextResponse.json({ error: 'Missing referenceImageUrl' }, { status: 400 });
@@ -149,6 +149,16 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.replace(triggerRegex, "the character");
     }
 
+    // Same reasoning as the main character's trigger word above: story/route.ts
+    // still embeds the companion's own trigger word in image_prompt (see
+    // secondaryTriggerWord/DIRECTOR RULES), but that word only ever meant
+    // anything to the companion's now-removed trained LoRA - strip it back
+    // out here too, replacing it with the companion's actual name.
+    if (companionTriggerWord) {
+      const companionTriggerRegex = new RegExp(companionTriggerWord, 'gi');
+      cleanedPrompt = cleanedPrompt.replace(companionTriggerRegex, companionName || "the companion character");
+    }
+
     if (cleanedPrompt.toLowerCase().includes("car")) {
       cleanedPrompt = cleanedPrompt.replace(/sports car|sportbil|car/gi, "vintage hand-drawn car");
     }
@@ -194,14 +204,38 @@ export async function POST(request: Request) {
     const identitySubject = charDesc || "person";
     const identityLock = "IDENTITY LOCK (CRITICAL, NOT OPTIONAL): This must be 100% recognizable as the exact same " + identitySubject + " shown in the reference photo. Preserve all facial features, face shape, eye color, hair color and texture, and skin tone EXACTLY as shown in the reference photo - this is critical, not optional. Anyone who knows this " + identitySubject + " should immediately recognize them in the generated image.";
 
+    // Replaces the old extraLoraId/extraLoraScale mechanism (a second trained
+    // LoRA blended in for scenes mentioning the companion by trigger word).
+    // Gemini has no LoRA concept, but it does accept multiple reference
+    // images in one request - so the companion's own reference photo is sent
+    // as a second inline_data part instead, with a clause telling Gemini
+    // which photo is which. Only present when the companion has its own
+    // saved reference photo AND this specific panel's prompt actually
+    // mentions the companion (see companionReferenceImageUrlForPrompt in
+    // app/skapa/page.tsx) - same "only when relevant to this scene" gating
+    // the old LoRA version used, just with a photo instead of a model id.
+    const companionClause = companionReferenceImageUrl
+      ? " A second reference photo shows " + (companionName || "the companion character") + " - preserve their appearance consistently as well."
+      : "";
+
     const finalPrompt = identityLock + " " +
       "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " +
-      style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + style.styleConsistency +
+      style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + style.styleConsistency + companionClause +
       ". Avoid: " + style.negative + ", wrong outfit, different clothes, clone, duplicate face, cloned face, same face repeated on multiple people, identical twins in background, multiple people with same appearance.";
 
-    console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | Prompt: " + finalPrompt);
+    console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | companion reference image included: " + !!companionReferenceImageUrl + " | Prompt: " + finalPrompt);
 
     const referenceImageBase64 = await fetchReferenceImageAsBase64(referenceImageUrl);
+
+    const contentParts: any[] = [
+      { text: finalPrompt },
+      { inline_data: { mime_type: 'image/jpeg', data: referenceImageBase64 } },
+    ];
+
+    if (companionReferenceImageUrl) {
+      const companionImageBase64 = await fetchReferenceImageAsBase64(companionReferenceImageUrl);
+      contentParts.push({ inline_data: { mime_type: 'image/jpeg', data: companionImageBase64 } });
+    }
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -210,12 +244,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: finalPrompt },
-            { inline_data: { mime_type: 'image/jpeg', data: referenceImageBase64 } },
-          ],
-        }],
+        contents: [{ parts: contentParts }],
         generationConfig: {
           imageConfig: { aspectRatio: GEMINI_ASPECT_RATIO },
         },

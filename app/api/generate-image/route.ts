@@ -181,8 +181,19 @@ export async function POST(request: Request) {
     // to give strong identity preservation against Gemini (see
     // scripts/nano-banana-test.js's buildPrompt()) - a prominent, first-
     // paragraph statement rather than a trailing clause.
+    //
+    // The second sentence (reference photos are for identity only, ignore
+    // their clothing) was added after a real test book showed the outfit
+    // changing every panel despite the outfit-lock sentence further down
+    // (finalOutfit) being present and consistent across every single call -
+    // confirmed via Vercel logs, not a prompt-construction bug. Root cause:
+    // the 5-8 reference photos are ordinary photos of the person in whatever
+    // they actually happened to be wearing, and Gemini was visually weighing
+    // that real clothing over the text instruction. Placed directly in the
+    // same paragraph as the reference-photo mentions so it's read in close
+    // proximity to them, rather than appended at the end of the prompt.
     const identitySubject = charDesc || "person";
-    const identityLock = "IDENTITY LOCK (CRITICAL, NOT OPTIONAL): This must be 100% recognizable as the exact same " + identitySubject + " shown in the reference photo. Preserve all facial features, face shape, eye color, hair color and texture, and skin tone EXACTLY as shown in the reference photo - this is critical, not optional. Anyone who knows this " + identitySubject + " should immediately recognize them in the generated image.";
+    const identityLock = "IDENTITY LOCK (CRITICAL, NOT OPTIONAL): This must be 100% recognizable as the exact same " + identitySubject + " shown in the reference photos. Preserve all facial features, face shape, eye color, hair color and texture, and skin tone EXACTLY as shown in the reference photos - this is critical, not optional. Anyone who knows this " + identitySubject + " should immediately recognize them in the generated image. IMPORTANT: The reference photos are provided SOLELY to establish facial identity, face shape, and skin tone - completely IGNORE any clothing visible in the reference photos. The character's outfit in the generated image must strictly follow the outfit description below, regardless of what they happen to be wearing in the reference photos.";
 
     // Replaces the old extraLoraId/extraLoraScale mechanism (a second trained
     // LoRA blended in for scenes mentioning the companion by trigger word).

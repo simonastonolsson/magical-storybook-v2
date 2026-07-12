@@ -329,10 +329,10 @@ export default function Page() {
   // Gemini needs no training - just the reference photos themselves, saved
   // directly via the same /api/upload-reference path used for a single photo
   // before. Uploads run in parallel since each is an independent request.
-  // Not persisted to user_models here (session-only for now) - this new
-  // character is fully usable for generating this book, but won't show up
-  // in the saved-character picker on a future visit until that persistence
-  // path is rebuilt without the LoRA-era model_path/trigger_word fields.
+  // Also persists the character to user_models (POST /api/user-models, now
+  // rebuilt to accept reference_image_urls instead of requiring a trained
+  // model_path/trigger_word) so it shows up in the saved-character picker on
+  // a future visit, same as trained characters used to.
   const handleSaveReferencePhotos = async () => {
     if (selectedFiles.length < 5) { alert('Ladda upp minst 5 foton!'); return; }
     const trimmedName = charName.trim();
@@ -345,6 +345,24 @@ export default function Page() {
       setReferencePhotosStatus('Sparar foton...');
       const urls = await Promise.all(selectedFiles.map((file) => uploadReferenceImageToBlob(file)));
       setReferenceImageUrls(urls);
+
+      const saveRes = await fetch('/api/user-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_name: charName || 'Min karaktär',
+          reference_image_urls: urls,
+          char_desc: charDesc,
+        }),
+      });
+      if (saveRes.ok) {
+        const { model } = await saveRes.json();
+        setSavedModelDbId(model.id);
+        setSavedCharacters(prev => [model, ...prev]);
+      } else {
+        console.error('Failed to persist character to user_models:', await saveRes.text());
+      }
+
       setReferencePhotosStatus('Klart! Din karaktär är redo.');
     } catch (err) {
       console.error(err);

@@ -21,21 +21,7 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Lets the client resume/finalize trainings that were still in progress the
-  // last time this account was seen (e.g. the tab was closed or reloaded
-  // mid-training) - see app/api/check-training/route.ts for how these get
-  // created and finalized.
-  const { data: pendingTrainings, error: pendingError } = await supabase
-    .from('pending_trainings')
-    .select('training_id, model_name, trigger_word, created_at')
-    .eq('status', 'training')
-    .order('created_at', { ascending: false });
-
-  if (pendingError) {
-    console.error('Failed to load pending trainings:', pendingError);
-  }
-
-  return NextResponse.json({ models: data, pendingTrainings: pendingTrainings || [] });
+  return NextResponse.json({ models: data });
 }
 
 export async function POST(request: Request) {
@@ -50,9 +36,9 @@ export async function POST(request: Request) {
 
   const body: NewUserModel = await request.json();
 
-  if (!body.model_path || !body.model_name || !body.trigger_word) {
+  if (!body.model_name || !Array.isArray(body.reference_image_urls) || body.reference_image_urls.length === 0) {
     return NextResponse.json(
-      { error: 'Missing required fields: model_path, model_name, trigger_word' },
+      { error: 'Missing required fields: model_name, reference_image_urls' },
       { status: 400 }
     );
   }
@@ -75,11 +61,19 @@ export async function POST(request: Request) {
     .from('user_models')
     .insert({
       user_id: user.id,
-      model_path: body.model_path,
       model_name: body.model_name,
-      trigger_word: body.trigger_word,
       char_desc: body.char_desc ?? null,
-      reference_image_url: body.reference_image_url ?? null,
+      // The table only has room for a single reference_image_url (LoRA-era
+      // schema, not changed here per the "don't touch the DB yet" rule) -
+      // store the first of the possibly-several uploaded photos. All of them
+      // still get used for THIS session's generation regardless (see
+      // referenceImageUrls in app/skapa/page.tsx), just not all persisted.
+      reference_image_url: body.reference_image_urls[0],
+      // model_path/trigger_word: LoRA-era NOT NULL-safe placeholders. These
+      // columns are unused everywhere else in the app now - kept populated
+      // only because the columns themselves haven't been dropped yet.
+      model_path: 'gemini-reference-only',
+      trigger_word: 'n/a',
     })
     .select()
     .single();

@@ -10,9 +10,7 @@ export type UserModel = {
 };
 
 export type NewUserModel = {
-  model_path: string;
   model_name: string;
-  trigger_word: string;
+  reference_image_urls: string[];
   char_desc?: string | null;
-  reference_image_url?: string | null;
 };

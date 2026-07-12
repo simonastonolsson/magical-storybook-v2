@@ -53,7 +53,7 @@ const loraWeightsUrl = 'REPLACE_WITH_LORA_WEIGHTS_URL';
 // Find it via Supabase: `select reference_image_url from user_models where
 // trigger_word = 'BOBBANTOK';` - or open the character picker in the app
 // and inspect the thumbnail <img>'s src in devtools.
-const referenceImageUrl = 'REPLACE_WITH_REFERENCE_IMAGE_URL';
+const referenceImageUrl = 'https://xaaduajcznqctcuymrzb.supabase.co/storage/v1/object/public/reference-images/754556d9-81e5-4718-8ee7-c0c4ce4a6a7d/reference-1783597467684.jpg';
 
 const triggerWord = 'BOBBANTOK';
 const charDesc = 'a young boy';

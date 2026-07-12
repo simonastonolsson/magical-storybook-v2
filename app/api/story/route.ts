@@ -7,11 +7,9 @@ export async function POST(req: Request) {
     const {
       prompt,
       characterName,
-      characterTrigger,
       characterDescription,
       secondaryName,
-      secondaryTrigger,
-      secondaryTriggerWord,
+      secondaryDescription,
       pageCount,
       charOutfit
     } = await req.json();
@@ -22,7 +20,6 @@ export async function POST(req: Request) {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const name = characterName || "Simon";
-    const trigger = characterTrigger || "TOK";
     const desc = characterDescription || "an adult man";
     const finalPageCount = pageCount || 12;
 
@@ -44,17 +41,16 @@ export async function POST(req: Request) {
       : "classic navy blue sweater and dark grey trousers";
     const signatureOutfit = "wearing his signature " + (charOutfit || defaultOutfit);
 
-    const companionInstruction = secondaryName && secondaryTrigger && secondaryTriggerWord
-      ? `There is also a companion in the story: ${secondaryTrigger}.
-         The companion's Name is "${secondaryName}".
-         The companion's UNIQUE Trigger Word is "${secondaryTriggerWord}".
-         You MUST include this companion in both the story narration (using their name: ${secondaryName}) and the image_prompt (using their unique trigger word: "${secondaryTriggerWord}"). Their described appearance must also remain fixed throughout every panel, with no age, gender, or species drift.`
+    const companionInstruction = secondaryName && secondaryDescription
+      ? `There is also a companion in the story: ${secondaryDescription}.
+         The companion's name is "${secondaryName}".
+         You MUST include this companion in both the story narration and the image_prompt, referring to them by name ("${secondaryName}") in both. Their described appearance must also remain fixed throughout every panel, with no age, gender, or species drift.`
       : "There are no other main companions in this story.";
 
     const fullPrompt = `You are an expert comic book director. Create a dynamic comic book script based on the user's idea: "${prompt}".
 
       CHARACTERS TO PORTRAY:
-      - Main Character: Name is "${name}". UNIQUE Trigger Word is "${trigger}". Appearance is "${desc}".
+      - Main Character: Name is "${name}". Appearance is "${desc}".
       - Main Character Signature Outfit (MUST BE USED IN EVERY PANEL): "${signatureOutfit}".
       - ${companionInstruction}
 
@@ -64,15 +60,13 @@ export async function POST(req: Request) {
       3. Write "image_prompt" in ENGLISH.
       4. CAMERA ANGLES FOR PERFECT LIKENESS (STRICT CONSISTENCY RULE):
          - Avoid extreme angles: Do NOT use low-angles looking straight up, do NOT use high-angles looking straight down, and do NOT use strict profile views (side profiles).
-         - Always write prompts specifying a "three-quarter face view" or "waist-up three-quarter shot" whenever depicting ${trigger} face. This is the optimal angle for facial resemblance.
+         - Always write prompts specifying a "three-quarter face view" or "waist-up three-quarter shot" whenever depicting ${name}'s face. This is the optimal angle for facial resemblance.
          - Ensure characters look active, engaged, and are looking slightly away from the camera into their action, never directly into the lens.
       5. OUTFIT LOCKING (STRICT CONSISTENCY RULE):
-         - You MUST include ${trigger} and his exact signature outfit "${signatureOutfit}" in the image_prompt of EVERY SINGLE PANEL. His clothes must NEVER change, not even for sleeping or active scenes. This is the visual red thread of the book.
-      6. CLONE PREVENTION (CRITICAL - READ CAREFULLY):
-         - Each image_prompt must contain the trigger word "${trigger}" EXACTLY ONCE. Never repeat it in the same prompt.
-         - If the companion is in the scene, use their trigger word EXACTLY ONCE as well.
-         - Writing a trigger word twice in one prompt will cause the AI to draw two copies of the same character. This is forbidden.
-         - Double-check every image_prompt before writing it: count how many times "${trigger}" appears and ensure it is exactly 1.
+         - You MUST include ${name} and his exact signature outfit "${signatureOutfit}" in the image_prompt of EVERY SINGLE PANEL. His clothes must NEVER change, not even for sleeping or active scenes. This is the visual red thread of the book.
+      6. SINGLE CHARACTER INSTANCE RULE (CRITICAL - avoids the AI accidentally drawing duplicate copies of the same person):
+         - ${name} must appear as exactly ONE single instance of themselves in each image_prompt - never describe or imply two or more copies, a mirror image, a reflection, or a "twin" of ${name} in the same panel, unless the scene explicitly calls for a mirror or reflection as part of the story.
+         - The same applies to the companion, if present in the scene: exactly one instance of them as well.
       7. APPEARANCE LOCKING (STRICT CONSISTENCY RULE):
          - The character's appearance is fixed as exactly "${desc}" for the ENTIRE story, in every single panel, with zero exceptions.
          - Do not age the character up or down, do not change their gender, species, or any physical trait, and do not alter this description based on the scene, activity, time of day, or mood - a panel showing them asleep, playing, or in danger must still describe them as exactly "${desc}".
@@ -159,20 +153,20 @@ export async function POST(req: Request) {
          - Describe ONLY the pose, action, and immediate setting/environment (e.g.
            "standing proudly over a finished gourmet dish in a warmly lit kitchen, holding
            a wooden spoon triumphantly").
-         - Do NOT mention or describe ${trigger}'s physical appearance, age, gender,
+         - Do NOT mention or describe ${name}'s physical appearance, age, gender,
            species, body type, or outfit in "cover_scene" - that is handled separately
            elsewhere in the pipeline and must not be repeated, changed, or contradicted here.
-           This restriction applies ONLY to ${trigger} (the main character).
+           This restriction applies ONLY to ${name} (the main character).
          - EXCEPTION FOR THE COMPANION: if the companion also appears in the cover scene,
            you MUST describe its species/form/appearance just as clearly as you would in a
            regular panel (e.g. "a green dinosaur", not just its name). The companion does
-           NOT have the same technical appearance-lock protection that ${trigger} has
+           NOT have the same technical appearance-lock protection that ${name} has
            elsewhere in the pipeline - it depends entirely on you actually describing it
            correctly in every context, including the cover. Never reduce the companion to
            just its name here.
-         - Do NOT include the trigger word "${trigger}" anywhere in "cover_scene" - it is
-           added automatically immediately before this text when building the final cover
-           image prompt.
+         - Do NOT include ${name}'s name anywhere in "cover_scene" - a fixed reference to
+           the character is added automatically immediately before this text when building
+           the final cover image prompt.
 
       CRITICAL IMAGE_PROMPT RULES (Write in English, describing only the scene and action - the illustration's visual style is applied separately later in the pipeline):
       1. Every image_prompt MUST start exactly with: "Comic book panel illustration, graphic novel art, "
@@ -192,19 +186,19 @@ export async function POST(req: Request) {
            panel, they contradict each other.
          - Ensure substantial empty headroom above the character's hair so they are never
            cropped out, regardless of framing choice.
-      3. Use the correct trigger words and descriptions naturally inside the actions:
-         - If only ${name} is in the scene: include "drawing of ${trigger}, ${desc}, ${signatureOutfit}, three-quarter face view, looking away from the camera, [DOING SOME SPECIFIC ACTION]".
-         - If BOTH are in the scene: include them together, interacting or doing an activity (e.g., "drawing of ${trigger}, ${desc}, ${signatureOutfit}, and ${secondaryTriggerWord || "COMPANIONTOK"}, both in three-quarter view, laughing and talking together while [DOING SOME SPECIFIC ACTION]").
+      3. Refer to characters naturally by name inside the actions:
+         - If only ${name} is in the scene: include "drawing of ${name}, ${desc}, ${signatureOutfit}, three-quarter face view, looking away from the camera, [DOING SOME SPECIFIC ACTION]".
+         - If BOTH are in the scene: include them together, interacting or doing an activity (e.g., "drawing of ${name}, ${desc}, ${signatureOutfit}, and ${secondaryName || "their companion"}, both in three-quarter view, laughing and talking together while [DOING SOME SPECIFIC ACTION]").
 
       Return ONLY a JSON object with this exact structure:
       {
         "title": "A beautiful title in the prompts language",
-        "cover_scene": "One sentence in English describing an iconic pose/setting from THIS story - no appearance, age, gender, or outfit details, and no trigger word",
+        "cover_scene": "One sentence in English describing an iconic pose/setting from THIS story - no appearance, age, gender, or outfit details, and no name mention",
         "panels": [
           {
             "panel_number": 1,
             "narration": "Narration text in the prompts language...",
-            "image_prompt": "Comic book panel illustration, graphic novel art, waist-up three-quarter view medium shot of the first subject ${trigger}, ${desc}, ${signatureOutfit}, with substantial empty headroom, looking away from the camera, engaged in..."
+            "image_prompt": "Comic book panel illustration, graphic novel art, waist-up three-quarter view medium shot of the first subject ${name}, ${desc}, ${signatureOutfit}, with substantial empty headroom, looking away from the camera, engaged in..."
           }
         ]
       }`;

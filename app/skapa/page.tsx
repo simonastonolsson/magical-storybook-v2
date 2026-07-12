@@ -464,19 +464,17 @@ export default function Page() {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const getCompanionTriggerWord = () => companionName.replace(/[^a-zA-Z]/g, "").toUpperCase() + 'TOK';
-
   // useCustomCompanionAI/companionReferenceImageUrl being set means the
   // companion feature is enabled for the book, but not that the companion
   // actually appears in a given panel's own prompt. Sending the companion's
   // reference photo on every single generation call (even solo-character
   // scenes) risks interfering with the main character's fidelity, so only
-  // include it when the companion's trigger word is actually present in that
-  // specific prompt (story/route.ts still embeds it there - see
-  // secondaryTriggerWord/DIRECTOR RULES).
+  // include it when the companion is actually mentioned by name in that
+  // specific prompt (story/route.ts's companionInstruction requires the
+  // companion be referred to by name in every image_prompt they appear in).
   const companionReferenceImageUrlForPrompt = (promptText: string) => {
-    if (!useCustomCompanionAI || !companionReferenceImageUrl) return null;
-    return new RegExp(getCompanionTriggerWord(), 'i').test(promptText || '') ? companionReferenceImageUrl : null;
+    if (!useCustomCompanionAI || !companionReferenceImageUrl || !companionName) return null;
+    return new RegExp(companionName, 'i').test(promptText || '') ? companionReferenceImageUrl : null;
   };
 
   const generateImagesForComic = async (comicData: any, baseSeed: number) => {
@@ -492,14 +490,12 @@ export default function Page() {
           body: JSON.stringify({
             prompt: panel.image_prompt,
             trainedModelId,
-            triggerWord: charTrigger,
             charDesc,
             charName,
             charOutfit: customOutfit || charOutfit,
             bookStyle,
             referenceImageUrl,
             companionReferenceImageUrl: companionReferenceImageUrlForPrompt(panel.image_prompt),
-            companionTriggerWord: useCustomCompanionAI ? getCompanionTriggerWord() : null,
             companionName: companionName || null,
             seed: baseSeed + i + 1,
             isCover: false
@@ -515,11 +511,10 @@ export default function Page() {
     setIsGeneratingImages(false);
   };
 
-  // Experiment J: the trigger word is added separately (once) as the "Main
-  // subject:" prefix in generate-image/route.ts's finalPrompt construction -
-  // it must not also appear here, or the model sees it twice in one prompt,
-  // which the story prompt's own CLONE PREVENTION rule warns causes duplicate
-  // characters to be drawn.
+  // "the character" here is the fixed reference story/route.ts's COVER SCENE
+  // rule says gets added automatically before cover_scene - the character's
+  // name/identity is established separately via the IDENTITY LOCK paragraph
+  // in generate-image/route.ts, so it isn't repeated here too.
   const buildCoverPrompt = (title: string, coverScene: string) =>
     "Comic book cover art, dramatic graphic novel cover illustration, the character " + (coverScene || "in a dynamic heroic action pose, mid-motion, dramatic angle") + ", waist-up close-up portrait composition with the character large and close in the foreground, the character's entire head and hair fully visible with generous headroom above, never cropped at the top of frame, layered composition with a detailed background scene evoking the story '" + title + "': " + memory + ", cinematic dramatic lighting, high contrast, bold saturated colors, epic composition, title-ready framing with clear space at top and bottom for text, bold attention-grabbing cover illustration";
 
@@ -533,14 +528,12 @@ export default function Page() {
         body: JSON.stringify({
           prompt: coverPrompt,
           trainedModelId,
-          triggerWord: charTrigger,
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
           bookStyle,
           referenceImageUrl,
           companionReferenceImageUrl: companionReferenceImageUrlForPrompt(coverPrompt),
-          companionTriggerWord: useCustomCompanionAI ? getCompanionTriggerWord() : null,
           companionName: companionName || null,
           seed: baseSeed,
           isCover: true
@@ -567,16 +560,9 @@ export default function Page() {
     setGeneratedImages({});
     setCoverImageUrl(null);
     let secondaryDescription = "";
-    const companionTriggerWord = getCompanionTriggerWord();
     if (companionType === 'dog') secondaryDescription = 'a friendly golden retriever dog named ' + (companionName || "Aston");
     if (companionType === 'cat') secondaryDescription = 'a cute fluffy cat named ' + (companionName || "Misse");
-    if (companionType === 'friend') {
-      if (useCustomCompanionAI && companionReferenceImageUrl) {
-        secondaryDescription = 'a close friend named ' + (companionName || "Kompis") + ' represented by ' + companionTriggerWord;
-      } else {
-        secondaryDescription = 'a close friend named ' + (companionName || "Kompis");
-      }
-    }
+    if (companionType === 'friend') secondaryDescription = 'a close friend named ' + (companionName || "Kompis");
     try {
       const response = await fetch('/api/story', {
         method: 'POST',
@@ -584,11 +570,9 @@ export default function Page() {
         body: JSON.stringify({
           prompt: memory,
           characterName: charName,
-          characterTrigger: charTrigger,
           characterDescription: charDesc,
           secondaryName: companionName || null,
-          secondaryTrigger: secondaryDescription || null,
-          secondaryTriggerWord: useCustomCompanionAI ? companionTriggerWord : null,
+          secondaryDescription: secondaryDescription || null,
           pageCount,
           charOutfit: customOutfit || charOutfit || null
         }),
@@ -623,14 +607,12 @@ export default function Page() {
         body: JSON.stringify({
           prompt: refinedPrompt,
           trainedModelId,
-          triggerWord: charTrigger,
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
           bookStyle,
           referenceImageUrl,
           companionReferenceImageUrl: companionReferenceImageUrlForPrompt(refinedPrompt),
-          companionTriggerWord: useCustomCompanionAI ? getCompanionTriggerWord() : null,
           companionName: companionName || null,
           isCover: false
         }),
@@ -669,14 +651,12 @@ export default function Page() {
         body: JSON.stringify({
           prompt: refinedPrompt,
           trainedModelId,
-          triggerWord: charTrigger,
           charDesc,
           charName,
           charOutfit: customOutfit || charOutfit,
           bookStyle,
           referenceImageUrl,
           companionReferenceImageUrl: companionReferenceImageUrlForPrompt(refinedPrompt),
-          companionTriggerWord: useCustomCompanionAI ? getCompanionTriggerWord() : null,
           companionName: companionName || null,
           isCover: true
         }),

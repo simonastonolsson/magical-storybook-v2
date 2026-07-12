@@ -99,9 +99,9 @@ async function fetchReferenceImageAsBase64(url: string): Promise<string> {
 
 export async function POST(request: Request) {
   try {
-    const { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle, isCover, companionReferenceImageUrl, companionTriggerWord, companionName } = await request.json();
+    const { prompt, referenceImageUrl, charDesc, charOutfit, bookStyle, isCover, companionReferenceImageUrl, companionName } = await request.json();
 
-    console.log("generate-image request body:", { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle, companionReferenceImageUrl, companionTriggerWord, companionName });
+    console.log("generate-image request body:", { prompt, referenceImageUrl, charDesc, charOutfit, bookStyle, companionReferenceImageUrl, companionName });
 
     if (!referenceImageUrl) {
       return NextResponse.json({ error: 'Missing referenceImageUrl' }, { status: 400 });
@@ -138,26 +138,6 @@ export async function POST(request: Request) {
       cleanedPrompt = cleanedPrompt.slice(stylePrefix.length).trim();
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
-
-    // story/route.ts's CLONE PREVENTION rule still requires every image_prompt
-    // to contain the character's trigger word exactly once (unchanged, see
-    // that file) - strip it back out here since Gemini has no trigger-word
-    // concept and it would otherwise just show up as a stray token in the
-    // prompt text.
-    if (triggerWord) {
-      const triggerRegex = new RegExp(triggerWord, 'gi');
-      cleanedPrompt = cleanedPrompt.replace(triggerRegex, "the character");
-    }
-
-    // Same reasoning as the main character's trigger word above: story/route.ts
-    // still embeds the companion's own trigger word in image_prompt (see
-    // secondaryTriggerWord/DIRECTOR RULES), but that word only ever meant
-    // anything to the companion's now-removed trained LoRA - strip it back
-    // out here too, replacing it with the companion's actual name.
-    if (companionTriggerWord) {
-      const companionTriggerRegex = new RegExp(companionTriggerWord, 'gi');
-      cleanedPrompt = cleanedPrompt.replace(companionTriggerRegex, companionName || "the companion character");
-    }
 
     if (cleanedPrompt.toLowerCase().includes("car")) {
       cleanedPrompt = cleanedPrompt.replace(/sports car|sportbil|car/gi, "vintage hand-drawn car");

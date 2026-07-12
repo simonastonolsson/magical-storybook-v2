@@ -30,8 +30,43 @@ const fs = require('fs');
 const https = require('https');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// This is what we TRIED first - "gemini-3-pro-image" 404'd ("not found for
+// API version v1, or is not supported for generateContent"). Kept here as
+// the default the script will still attempt IF it turns out to actually be
+// in the list below (e.g. under a different API version) - otherwise the
+// script lists real models and stops rather than repeating the same failure.
 const MODEL = 'gemini-3-pro-image';
 const REFERENCE_IMAGE_URL = 'https://xaaduajcznqctcuymrzb.supabase.co/storage/v1/object/public/reference-images/754556d9-81e5-4718-8ee7-c0c4ce4a6a7d/reference-1783597467684.jpg';
+
+// Lists models via Gemini's ListModels endpoint for a given API version
+// ("v1" or "v1beta" - the 404 explicitly mentioned "API version v1", so it's
+// worth checking whether the model actually lives under v1beta instead) and
+// prints every model that supports generateContent, flagging ones whose
+// name/description suggest image-generation capability ("Nano Banana").
+async function listImageModels(apiVersion) {
+  const url = 'https://generativelanguage.googleapis.com/' + apiVersion + '/models';
+  const res = await fetch(url, { headers: { 'x-goog-api-key': GEMINI_API_KEY } });
+  const rawBody = await res.text();
+  if (!res.ok) {
+    console.error('ListModels (' + apiVersion + ') failed (HTTP ' + res.status + '): ' + rawBody);
+    return [];
+  }
+  const data = JSON.parse(rawBody);
+  const models = data.models || [];
+  const generateContentModels = models.filter((m) =>
+    (m.supportedGenerationMethods || []).includes('generateContent')
+  );
+
+  console.log('\n=== Models under ' + apiVersion + ' supporting generateContent (' + generateContentModels.length + ') ===');
+  for (const m of generateContentModels) {
+    const looksLikeImage = /image|banana/i.test(m.name + ' ' + (m.displayName || '') + ' ' + (m.description || ''));
+    console.log((looksLikeImage ? '  [IMAGE?] ' : '          ') + m.name + (m.displayName ? '  (' + m.displayName + ')' : ''));
+  }
+
+  return generateContentModels
+    .filter((m) => /image|banana/i.test(m.name + ' ' + (m.displayName || '') + ' ' + (m.description || '')))
+    .map((m) => m.name.replace(/^models\//, ''));
+}
 
 // Same three scene types used in ip-adapter-test.js, for a like-for-like
 // comparison against the Flux + LoRA results.
@@ -63,8 +98,8 @@ function fetchAsBase64(url) {
   });
 }
 
-async function generateImage(prompt, referenceImageBase64) {
-  const url = 'https://generativelanguage.googleapis.com/v1/models/' + MODEL + ':generateContent';
+async function generateImage(prompt, referenceImageBase64, apiVersion, model) {
+  const url = 'https://generativelanguage.googleapis.com/' + apiVersion + '/models/' + model + ':generateContent';
   const body = {
     contents: [{
       parts: [
@@ -107,7 +142,43 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Fetching reference image from ' + REFERENCE_IMAGE_URL + ' ...');
+  // "gemini-3-pro-image" 404'd under v1 ("not found for API version v1, or
+  // is not supported for generateContent") - check both v1 and v1beta for
+  // whatever image-capable models this key actually has access to, instead
+  // of guessing model names again.
+  const v1Images = await listImageModels('v1');
+  const v1betaImages = await listImageModels('v1beta');
+
+  // Prefer a v1 match (matches the API version generateImage() calls below),
+  // fall back to v1beta if that's the only place the model is exposed.
+  let chosenApiVersion = null;
+  let chosenModel = null;
+  if (v1Images.includes(MODEL)) {
+    chosenApiVersion = 'v1';
+    chosenModel = MODEL;
+  } else if (v1betaImages.includes(MODEL)) {
+    chosenApiVersion = 'v1beta';
+    chosenModel = MODEL;
+  } else if (v1Images.length > 0) {
+    chosenApiVersion = 'v1';
+    chosenModel = v1Images[0];
+  } else if (v1betaImages.length > 0) {
+    chosenApiVersion = 'v1beta';
+    chosenModel = v1betaImages[0];
+  }
+
+  if (!chosenModel) {
+    console.error('\nNo image-generation-capable model found under v1 or v1beta for this API key.');
+    console.error('Check the full model lists printed above and update MODEL in this script by hand, then re-run.');
+    process.exit(1);
+  }
+
+  console.log('\nUsing model "' + chosenModel + '" under API version "' + chosenApiVersion + '".');
+  if (chosenModel !== MODEL) {
+    console.log('(This is different from the MODEL constant in the script - update it to "' + chosenModel + '" to skip this fallback next time.)');
+  }
+
+  console.log('\nFetching reference image from ' + REFERENCE_IMAGE_URL + ' ...');
   const referenceImageBase64 = await fetchAsBase64(REFERENCE_IMAGE_URL);
   console.log('Reference image loaded (' + referenceImageBase64.length + ' base64 chars).');
 
@@ -117,7 +188,7 @@ async function main() {
     console.log('Prompt: ' + prompt);
 
     try {
-      const imageBase64 = await generateImage(prompt, referenceImageBase64);
+      const imageBase64 = await generateImage(prompt, referenceImageBase64, chosenApiVersion, chosenModel);
       if (!imageBase64) {
         console.error('No image returned for ' + scene.name);
         continue;

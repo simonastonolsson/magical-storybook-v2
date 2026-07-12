@@ -1,46 +1,38 @@
 // Standalone, one-off script - NOT part of the production app. Run manually
-// on your own machine, with your own Supabase service role key:
+// on your own machine, with your own R2 credentials:
 //
-//   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key node scripts/extract-and-upload-lora.js
+//   R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... node scripts/extract-and-upload-lora.js
 //
 // Downloads Bobban's training output .tar from Replicate, extracts just
 // lora.safetensors (fal.ai's flux-lora rejects the full .tar with "Failed
 // to download the file" - it wants a direct weights file, not an archive),
-// uploads that single file to Supabase Storage in a new "lora-weights"
-// bucket (same public-bucket pattern as "reference-images"/"training-data"),
-// and prints the resulting public URL to paste into
-// scripts/ip-adapter-test.js's loraWeightsUrl.
+// and uploads that single file to Cloudflare R2.
 //
-// Uploads via Supabase Storage's TUS (resumable upload) protocol instead
-// of the plain storage.upload() call: confirmed the Supabase free plan
-// enforces a hard 50MB limit per file on standard uploads (not a
-// configurable bucket setting - "Restrict file size" was already off), and
-// lora.safetensors is ~164MB. TUS uploads in 6MB chunks instead, which
-// Supabase's free plan supports.
+// Previously uploaded to Supabase Storage (first a plain upload, then TUS
+// resumable upload after hitting the free plan's 50MB cap) - both failed
+// with "Maximum size exceeded" for this ~164MB file, confirming the 50MB
+// limit applies to total object size regardless of upload method, not just
+// standard uploads. R2 has no such per-file cap on this scale, so this
+// script now uploads there instead, via the S3-compatible API.
 //
-// PREREQUISITE: create a public bucket named "lora-weights" in the Supabase
-// dashboard (Storage -> New bucket -> name it exactly "lora-weights",
-// toggle "Public bucket" on) if it doesn't already exist - this script
-// does not create the bucket itself.
-//
-// Uses the SERVICE ROLE key (not the anon key production code uses),
-// since this is a one-off admin upload with no logged-in user session to
-// authenticate through - get it from Supabase dashboard -> Project
-// Settings -> API -> service_role secret. Treat it like a password: don't
-// commit it, don't paste it in chat, only pass it via the environment
-// variable above.
+// Uses R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY (an R2 API token's key pair,
+// not the Supabase service role key used before) - create one in the
+// Cloudflare dashboard under R2 -> Manage R2 API Tokens if you don't
+// already have one. Treat these like passwords: don't commit them, don't
+// paste them in chat, only pass them via the environment variables above.
 
 const fs = require('fs');
 const https = require('https');
 const path = require('path');
 const { execSync } = require('child_process');
-const { createClient } = require('@supabase/supabase-js');
-const tus = require('tus-js-client');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const TAR_URL = 'https://replicate.delivery/xezq/1XGMqkf1tnzUQSdLR54GvkBkTaUMW6erLWhEge9Qf05pXPdbB/trained_model.tar';
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xaaduajcznqctcuymrzb.supabase.co';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const BUCKET = 'lora-weights';
+const R2_ENDPOINT = 'https://d03bf47b7dc44d75a08e0498cfcfc565.r2.cloudflarestorage.com';
+const R2_BUCKET = 'storylabz-lora-weights';
+const R2_PUBLIC_BASE = 'https://pub-e6c8fa5a665146fda79c681454303294.r2.dev';
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 
 const workDir = path.join(__dirname, '..', '.lora-extract-tmp');
 const tarPath = path.join(workDir, 'trained_model.tar');
@@ -62,8 +54,8 @@ function downloadFile(url, destPath) {
 }
 
 async function main() {
-  if (!SERVICE_ROLE_KEY) {
-    console.error('Set SUPABASE_SERVICE_ROLE_KEY in the environment before running (see the header comment for where to get it).');
+  if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+    console.error('Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY in the environment before running (see the header comment for where to get them).');
     process.exit(1);
   }
 
@@ -84,61 +76,24 @@ async function main() {
 
     const uploadPath = 'bobban/lora-' + Date.now() + '.safetensors';
 
-    // Direct storage subdomain, recommended by Supabase for TUS uploads
-    // (faster than routing through the general project API domain).
-    const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
-    const tusEndpoint = 'https://' + projectRef + '.storage.supabase.co/storage/v1/upload/resumable';
-
-    console.log('Uploading to Supabase Storage bucket "' + BUCKET + '" at "' + uploadPath + '" via TUS (' + tusEndpoint + ') ...');
-
-    await new Promise((resolve, reject) => {
-      const upload = new tus.Upload(fileBuffer, {
-        endpoint: tusEndpoint,
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        headers: {
-          authorization: 'Bearer ' + SERVICE_ROLE_KEY,
-          apikey: SERVICE_ROLE_KEY,
-          'x-upsert': 'false',
-        },
-        uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true,
-        metadata: {
-          bucketName: BUCKET,
-          objectName: uploadPath,
-          contentType: 'application/octet-stream',
-          cacheControl: '3600',
-        },
-        chunkSize: 6 * 1024 * 1024, // fixed by Supabase's TUS implementation - do not change
-        onError: (err) => {
-          const body = err && err.originalResponse && typeof err.originalResponse._body === 'string'
-            ? err.originalResponse._body
-            : null;
-          console.error('\nUpload failed: ' + err.message);
-          if (body) console.error('Server response: ' + body);
-          console.error('If this mentions the bucket, create a public bucket named "' + BUCKET + '" in the Supabase dashboard first.');
-          reject(err);
-        },
-        onProgress: (bytesUploaded, bytesTotal) => {
-          const pct = ((bytesUploaded / bytesTotal) * 100).toFixed(1);
-          process.stdout.write('\r  Uploading... ' + pct + '% (' + bytesUploaded + ' / ' + bytesTotal + ' bytes)');
-        },
-        onSuccess: () => {
-          process.stdout.write('\n');
-          resolve();
-        },
-      });
-
-      upload.findPreviousUploads().then((previousUploads) => {
-        if (previousUploads.length) {
-          console.log('Resuming a previous incomplete upload...');
-          upload.resumeFromPreviousUpload(previousUploads[0]);
-        }
-        upload.start();
-      });
+    const s3 = new S3Client({
+      region: 'auto', // R2 doesn't use AWS regions - 'auto' is Cloudflare's documented convention for the S3-compatible API
+      endpoint: R2_ENDPOINT,
+      credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY,
+      },
     });
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(uploadPath);
+    console.log('Uploading to R2 bucket "' + R2_BUCKET + '" at "' + uploadPath + '" (' + (fileBuffer.length / 1024 / 1024).toFixed(1) + ' MB) ...');
+    await s3.send(new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: uploadPath,
+      Body: fileBuffer,
+      ContentType: 'application/octet-stream',
+    }));
+
+    const publicUrl = R2_PUBLIC_BASE + '/' + uploadPath;
 
     console.log('\nDone. Public URL:');
     console.log(publicUrl);
@@ -152,12 +107,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // onError above already printed a clean message for TUS-specific
-  // failures; avoid dumping the whole (very verbose) tus-js-client error
-  // object again here for those. Anything else (download/extract errors)
-  // still gets logged in full.
-  if (!err || !err.originalResponse) {
-    console.error(err);
-  }
+  console.error(err);
   process.exit(1);
 });

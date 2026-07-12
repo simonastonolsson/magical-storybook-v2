@@ -1,86 +1,74 @@
-import Replicate from 'replicate';
 import { NextResponse } from 'next/server';
 
-const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN } as any);
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualityBoost: string; qualityBoostNoLighting: string; styleConsistency: string; loraScale: number; loraScaleChild: number; loraScaleSolo: number; loraScaleSoloChild: number; loraScaleCrowd: number; loraScaleCrowdChild: number }> = {
+// Locked as a constant rather than re-running scripts/nano-banana-test.js's
+// listImageModels() discovery on every request (extra latency/cost per
+// call) - confirmed reachable and working for this API key during manual
+// testing (see scripts/nano-banana-test.js). API version is "v1beta" rather
+// than "v1" because the very first attempt at this model under "v1" 404'd
+// ("not found for API version v1, or is not supported for generateContent");
+// the discovery script's fallback logic found it successfully after that
+// without reporting a different chosen model, which only happens if it
+// matched under v1beta. Not independently re-verified against this exact
+// production endpoint yet - the first real request (see build/test plan)
+// will confirm or immediately surface a 404 if this assumption is wrong.
+const GEMINI_MODEL = 'gemini-3-pro-image';
+const GEMINI_API_VERSION = 'v1beta';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/' + GEMINI_API_VERSION + '/models/' + GEMINI_MODEL + ':generateContent';
+
+// Confirmed via scripts/nano-banana-test.js against the real book page
+// container (BOOK_ASPECT in app/skapa/page.tsx, 2:3 / 0.667 width/height):
+// requesting aspectRatio "2:3" returned 848x1264 (aspect 0.671) - close
+// enough that object-fit: cover (used by .book-page-img/.book-cover-img)
+// crops negligibly. Applied to every call, covers included - the cover
+// container's own ratio (COVER_ASPECT, ~0.727 w/h) is close enough that a
+// single shared aspect ratio is simpler than branching per isCover, and the
+// previous Replicate pipeline already used one fixed 1024x1152 for both.
+const GEMINI_ASPECT_RATIO = '2:3';
+
+const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualityBoost: string; qualityBoostNoLighting: string; styleConsistency: string }> = {
   digital_painting: {
     positive: "digital painted illustration, painterly art style, soft brush strokes, natural volumetric lighting, cinematic composition, detailed background environment, high quality digital painting, concept art, story illustration",
     negative: "photograph, photorealistic, DSLR, 3D CGI, Pixar, anime, chibi, flat colors, hard outlines, duplicates",
     qualityBoost: ", cinematic dramatic lighting, rich composition, vivid saturated colors, high quality detailed illustration",
     qualityBoostNoLighting: ", painterly illustrated rendering, rich composition, vivid saturated colors, high quality detailed illustration",
-    styleConsistency: ", consistent painterly illustration style, uniform artistic rendering throughout",
-    loraScale: 0.80,
-    loraScaleChild: 0.88,
-    loraScaleSolo: 0.85,
-    loraScaleSoloChild: 0.93,
-    loraScaleCrowd: 0.83,
-    loraScaleCrowdChild: 0.91
+    styleConsistency: ", consistent painterly illustration style, uniform artistic rendering throughout"
   },
   ligne_claire: {
     positive: "ligne claire comic art style, clean precise ink outlines, flat cel colors, bright even lighting, clear readable panels, European bande dessinee style, Tintin inspired illustration, bold outlines, simple clean backgrounds",
     negative: "photograph, photorealistic, 3D CGI, anime, shading, dark shadows, watercolor, rough textures, duplicates",
     qualityBoost: ", rich detailed composition, vivid bold flat colors, high quality clean illustration",
     qualityBoostNoLighting: ", rich detailed composition, vivid bold flat colors, high quality clean illustration",
-    styleConsistency: ", consistent clean-line illustration style, uniform artistic rendering throughout",
-    loraScale: 0.78,
-    loraScaleChild: 0.85,
-    loraScaleSolo: 0.83,
-    loraScaleSoloChild: 0.90,
-    loraScaleCrowd: 0.81,
-    loraScaleCrowdChild: 0.88
+    styleConsistency: ", consistent clean-line illustration style, uniform artistic rendering throughout"
   },
   american_comic: {
     positive: "American superhero comic book art, bold ink outlines, dynamic composition, strong contrasting colors, Marvel DC style illustration, halftone dots, dramatic lighting, action comic panel, professional comic art",
     negative: "photograph, photorealistic, 3D CGI, anime, watercolor, soft colors, duplicates, blurry",
     qualityBoost: ", cinematic dramatic lighting, rich dynamic composition, vivid saturated colors, high quality detailed illustration",
     qualityBoostNoLighting: ", bold comic illustrated rendering, rich dynamic composition, vivid saturated colors, high quality detailed illustration",
-    styleConsistency: ", consistent bold comic illustration style, uniform artistic rendering throughout",
-    loraScale: 0.78,
-    loraScaleChild: 0.85,
-    loraScaleSolo: 0.83,
-    loraScaleSoloChild: 0.90,
-    loraScaleCrowd: 0.81,
-    loraScaleCrowdChild: 0.88
+    styleConsistency: ", consistent bold comic illustration style, uniform artistic rendering throughout"
   },
   watercolor: {
     positive: "cozy heartwarming 2D hand-drawn watercolor storybook illustration, soft pencil sketch details, beautiful muted watercolor washes, warm pastel color palette, gentle sunlit lighting, clean elegant hand-drawn outlines, warm and inviting cozy atmosphere",
     negative: "photograph, photorealistic, 3D CGI, Pixar, anime, chibi, hard outlines, flat digital colors, duplicates",
     qualityBoost: ", rich detailed composition, luminous glowing colors, high quality detailed illustration",
     qualityBoostNoLighting: ", rich detailed composition, luminous glowing colors, high quality detailed illustration",
-    styleConsistency: ", consistent hand-painted watercolor illustration style, uniform artistic rendering throughout",
-    loraScale: 0.85,
-    loraScaleChild: 0.90,
-    loraScaleSolo: 0.90,
-    loraScaleSoloChild: 0.95,
-    loraScaleCrowd: 0.88,
-    loraScaleCrowdChild: 0.93
+    styleConsistency: ", consistent hand-painted watercolor illustration style, uniform artistic rendering throughout"
   },
   noir: {
     positive: "black and white noir comic illustration, high contrast ink drawing, dramatic shadows, cross-hatching technique, graphic novel art style, Sin City inspired, expressive ink lines, moody atmosphere, detailed pen and ink illustration",
     negative: "color, photograph, photorealistic, 3D CGI, anime, watercolor, pastel colors, duplicates",
     qualityBoost: ", dramatic high-contrast lighting, rich detailed composition, high quality detailed illustration",
     qualityBoostNoLighting: ", ink-drawn illustrated rendering, rich detailed composition, high quality detailed illustration",
-    styleConsistency: ", consistent ink-drawn illustration style, uniform artistic rendering throughout",
-    loraScale: 0.78,
-    loraScaleChild: 0.85,
-    loraScaleSolo: 0.83,
-    loraScaleSoloChild: 0.90,
-    loraScaleCrowd: 0.81,
-    loraScaleCrowdChild: 0.88
+    styleConsistency: ", consistent ink-drawn illustration style, uniform artistic rendering throughout"
   },
   pop_art: {
     positive: "Roy Lichtenstein pop art comic style, bold black outlines, Ben-Day dots pattern, primary flat colors, retro comic book illustration, speech bubbles style, graphic pop art panel, strong graphic design aesthetic",
     negative: "photograph, photorealistic, 3D CGI, anime, soft colors, watercolor, realistic shading, duplicates",
     qualityBoost: ", bold dynamic composition, vivid saturated colors, high quality detailed illustration",
     qualityBoostNoLighting: ", bold dynamic composition, vivid saturated colors, high quality detailed illustration",
-    styleConsistency: ", consistent graphic pop art illustration style, uniform artistic rendering throughout",
-    loraScale: 0.75,
-    loraScaleChild: 0.82,
-    loraScaleSolo: 0.80,
-    loraScaleSoloChild: 0.87,
-    loraScaleCrowd: 0.78,
-    loraScaleCrowdChild: 0.85
+    styleConsistency: ", consistent graphic pop art illustration style, uniform artistic rendering throughout"
   }
 };
 
@@ -88,17 +76,38 @@ const STYLE_PROMPTS: Record<string, { positive: string; negative: string; qualit
 // color-tinted or directional lighting, don't stack a second generic "dramatic
 // lighting" instruction on top of it via qualityBoost - the two independent
 // lighting cues compounding is a suspected contributor to identity drift
-// (e.g. hair color) in strongly lit scenes.
+// (e.g. hair color) in strongly lit scenes. Still relevant with Gemini: this
+// is a prompt-text decision, not a LoRA one.
 const intenseLightingKeywords = /\b(sunset|sunrise|golden hour|dusk|twilight|warm light|warm glow|warm glowing|dramatic light|dramatically lit|backlit|back-lit|silhouett\w*|firelight|fire light|candlelight|candle light|neon light|moonlit|moonlight|spotlight|harsh light|glowing embers|campfire|bonfire|lantern light|colou?red light(?:ing)?|stage lights?)\b/i;
+
+// Widened after a confirmed miss: a hockey scene ("teammates", "other
+// players", "spectators", "stands") matched none of the original narrow
+// list, so the scene was wrongly classified as solo and the background
+// diversity instruction below was skipped, leaking the main character's face
+// onto background teammates/spectators. Deliberately broad - better to over-
+// apply the diversity instruction than to risk leakage again.
+const multiPersonKeywords = /\b(crowd|crowds|spectator|spectators|audience|bystanders|onlookers|classmates|teammates|team-mates|team mates|players|other players|opposing team|opponents|skaters|other skaters|athletes|competitors|racers|dancers|singers|passengers|customers|guests|coworkers|colleagues|siblings|friends|family members|fans|cheering|stands|bleachers|stadium|arena|rink full of|group of|groups of|several people|many people|lots of people|dozens of|hundreds of|everyone|everybody|whole team|entire team|full team|packed (stands|arena|rink)|other (people|kids|children|students|players|skaters|athletes|teammates|racers|dancers|competitors)|companions|surrounded by|background characters|watching crowd|people watching)\b/i;
+
+async function fetchReferenceImageAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error('Failed to fetch reference image: HTTP ' + res.status);
+  }
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer).toString('base64');
+}
 
 export async function POST(request: Request) {
   try {
-    const { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, extraLoraId, extraLoraScale, seed, isCover } = await request.json();
+    const { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle, isCover } = await request.json();
 
-    console.log("generate-image request body:", { prompt, trainedModelId, triggerWord, charDesc, charOutfit, bookStyle, seed });
+    console.log("generate-image request body:", { prompt, referenceImageUrl, triggerWord, charDesc, charOutfit, bookStyle });
 
-    if (!trainedModelId) {
-      return NextResponse.json({ error: 'Missing trainedModelId' }, { status: 400 });
+    if (!referenceImageUrl) {
+      return NextResponse.json({ error: 'Missing referenceImageUrl' }, { status: 400 });
+    }
+    if (!GEMINI_API_KEY) {
+      return NextResponse.json({ error: 'Missing GEMINI_API_KEY' }, { status: 500 });
     }
 
     const isChild = charDesc?.toLowerCase().includes("boy") ||
@@ -111,12 +120,10 @@ export async function POST(request: Request) {
       : "wearing a classic navy blue crew-neck sweater with round neckline and dark grey trousers";
 
     const finalOutfit = charOutfit ? "wearing " + charOutfit : defaultOutfit;
-    const characterAnchor = (triggerWord || 'TOK') + ', ' + (charDesc || 'a person') + ', ' + finalOutfit;
 
-    // Verifies the outfit-lock fix: charOutfit received here should now be
-    // the same text story/route.ts used to build Gemini's signatureOutfit,
-    // so the scene text and this lock sentence no longer contradict each
-    // other. Log both so a real test run can confirm they match.
+    // Verifies the outfit-lock fix: charOutfit received here should be the
+    // same text story/route.ts used to build Gemini's signatureOutfit, so
+    // the scene text and this lock sentence don't contradict each other.
     console.log("Outfit check | charOutfit received: " + JSON.stringify(charOutfit) + " | finalOutfit injected into outfit lock: " + JSON.stringify(finalOutfit));
 
     const styleKey = bookStyle || 'digital_painting';
@@ -132,14 +139,11 @@ export async function POST(request: Request) {
     }
     cleanedPrompt = cleanedPrompt.replace(/^[\s,]+/, "");
 
-    // Experiment J follow-up: "Main subject: " + characterAnchor (added below)
-    // is now the sole intended mention of the trigger word in the whole
-    // finalPrompt. Any occurrence still inside cleanedPrompt (Gemini's own
-    // image_prompt, which CLONE PREVENTION requires to contain it exactly
-    // once) is now a second, redundant mention - previously adjacent to the
-    // "Main subject:" one, now separated from it by the framing sentence and
-    // the entire style.positive block after the reordering. Strip every
-    // occurrence here, not just extras beyond the first.
+    // story/route.ts's CLONE PREVENTION rule still requires every image_prompt
+    // to contain the character's trigger word exactly once (unchanged, see
+    // that file) - strip it back out here since Gemini has no trigger-word
+    // concept and it would otherwise just show up as a stray token in the
+    // prompt text.
     if (triggerWord) {
       const triggerRegex = new RegExp(triggerWord, 'gi');
       cleanedPrompt = cleanedPrompt.replace(triggerRegex, "the character");
@@ -157,132 +161,92 @@ export async function POST(request: Request) {
       ? ", character's exact childlike facial features and proportions preserved, do not age up"
       : ", character's exact facial features, bone structure and apparent age preserved from reference photos, do not age down or age up";
 
-    // Widened after a confirmed miss: a hockey scene ("teammates", "other
-    // players", "spectators", "stands") matched none of the original narrow
-    // list, so the scene was wrongly classified as solo and got the
-    // experiment-B lora_scale boost, leaking the main character's face onto
-    // background teammates/spectators. Deliberately broad - better to miss a
-    // boost opportunity than to risk leakage again.
-    const multiPersonKeywords = /\b(crowd|crowds|spectator|spectators|audience|bystanders|onlookers|classmates|teammates|team-mates|team mates|players|other players|opposing team|opponents|skaters|other skaters|athletes|competitors|racers|dancers|singers|passengers|customers|guests|coworkers|colleagues|siblings|friends|family members|fans|cheering|stands|bleachers|stadium|arena|rink full of|group of|groups of|several people|many people|lots of people|dozens of|hundreds of|everyone|everybody|whole team|entire team|full team|packed (stands|arena|rink)|other (people|kids|children|students|players|skaters|athletes|teammates|racers|dancers|competitors)|companions|surrounded by|background characters|watching crowd|people watching)\b/i;
-    // Diagnostic only: capture WHICH substring(s) actually matched, not just
-    // true/false, so a false positive on solo scenes can be pinned down to
-    // an exact word instead of guessed at.
     const multiPersonMatches = cleanedPrompt.match(new RegExp(multiPersonKeywords.source, 'gi')) || [];
     const hasMultiplePeople = multiPersonMatches.length > 0;
     const backgroundDiversity = hasMultiplePeople
       ? ", background characters have diverse and varied faces, different from the protagonist, unrelated bystanders with distinct individual appearances"
       : "";
 
-    // Experiment F: multiPersonKeywords targets crowds/groups, but a single
-    // named secondary character in close interaction with the main character
-    // (e.g. "the student receiving the book") matched none of those group
-    // words, so such scenes still got the solo lora_scale boost and leaked
-    // the main character's face onto that one other person. Separate,
-    // deliberately broad check for ANY other human role mentioned, singular
-    // or plural - independent of multiPersonKeywords/backgroundDiversity so
-    // neither one's future changes affect the other. Known limitation: this
-    // is keyword matching, not language understanding, so a pronoun-only
-    // reference ("he handed her a gift") with no role noun isn't caught.
-    const secondaryPersonKeywords = /\b(student|classmate|colleague|coworker|co-worker|teammate|friend|sibling|neighbor|neighbour|stranger|passerby|passer-by|visitor|guest|customer|client|patient|admirer|rival|opponent|librarian|teacher|doctor|nurse|waiter|waitress|cashier|driver|pedestrian|boy|girl|man|woman|kid|child|person|someone|figure|individual)\b/i;
-    // Diagnostic only, same reasoning as multiPersonMatches above. Suspect:
-    // Gemini's own image_prompt template embeds the main character's own
-    // ${desc} (e.g. "a young boy") directly into cleanedPrompt (see the JSON
-    // schema example in story/route.ts), and this list includes generic
-    // nouns like "boy"/"girl"/"man"/"woman"/"child" that would match that
-    // self-description on every single panel, regardless of whether any
-    // actual secondary character is in the scene.
-    const secondaryPersonMatches = cleanedPrompt.match(new RegExp(secondaryPersonKeywords.source, 'gi')) || [];
-    const hasSecondaryPerson = secondaryPersonMatches.length > 0;
-
     const sceneHasIntenseLighting = intenseLightingKeywords.test(cleanedPrompt);
     const qualityBoost = sceneHasIntenseLighting ? style.qualityBoostNoLighting : style.qualityBoost;
 
     // Cover prompts (buildCoverPrompt in app/skapa/page.tsx) bake their own
-    // composition/lighting flourish directly into the scene text itself
-    // ("layered composition with a detailed background scene... cinematic
-    // dramatic lighting, high contrast, bold saturated colors, epic
-    // composition"), on top of the SAME qualityBoost panels also get - a
-    // genuine double dose, confirmed not caught by sceneHasIntenseLighting
-    // above (word-boundary fails to match "lighting" against the
-    // "dramatic light" keyword, so cover never gets qualityBoostNoLighting).
-    // Panels only ever get the single qualityBoost dose, since Gemini's own
-    // scene text is comparatively plain/functional. Give panels an
-    // equivalent second layer here - deliberately using different words
-    // than qualityBoost already contributes ("rich composition", "vivid
-    // saturated colors", "cinematic dramatic lighting") to avoid repeating
-    // the same phrase twice in one prompt.
+    // composition/lighting flourish directly into the scene text itself, on
+    // top of the SAME qualityBoost panels also get - a genuine double dose.
+    // Panels only get the single qualityBoost, since Gemini's own scene text
+    // is comparatively plain/functional - give panels an equivalent second
+    // layer here, using different words than qualityBoost already
+    // contributes to avoid repeating the same phrase twice in one prompt.
     const panelCompositionBoost = ", layered scene composition with atmospheric depth, high contrast dramatic staging";
 
     // Read-only diagnostic for the "medium close-up shot" vs "waist-up...
     // medium shot" framing observation - no behavior change. Gemini picks
     // this phrase freely per panel from CAMERA FRAMING RULE's menu in
-    // story/route.ts; nothing in this file selects or generates it. Logging
-    // which phrase(s) actually landed in this panel's own text so a real
-    // test run can be correlated against how each panel actually rendered.
+    // story/route.ts; nothing in this file selects or generates it.
     const framingPhrasesFound = (cleanedPrompt.match(/medium close-up|waist-up[a-z ,-]*(medium )?shot|three-quarter face view|wide angle|shot from a distance|establishing shot/gi) || []);
     console.log("Framing check | Phrases found in this panel's prompt: " + JSON.stringify(framingPhrasesFound));
 
-    // Experiment J: trigger word + core identity moved to the very front of the
-    // prompt (previously buried after the framing sentence and the entire
-    // style.positive block) - some models weight earlier tokens more heavily,
-    // so this keeps the LoRA identity anchor from being diluted by a long
-    // preamble. Same fragments as before, only reordered.
-    const finalPrompt = "Main subject: " + characterAnchor + ", realistic facial features preserved from reference photos. " + "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " + style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + style.styleConsistency;
+    // IDENTITY LOCK: replaces the old "Main subject: TOK, ..." LoRA-trigger-
+    // word opening. Wording matches what was manually tested and confirmed
+    // to give strong identity preservation against Gemini (see
+    // scripts/nano-banana-test.js's buildPrompt()) - a prominent, first-
+    // paragraph statement rather than a trailing clause.
+    const identitySubject = charDesc || "person";
+    const identityLock = "IDENTITY LOCK (CRITICAL, NOT OPTIONAL): This must be 100% recognizable as the exact same " + identitySubject + " shown in the reference photo. Preserve all facial features, face shape, eye color, hair color and texture, and skin tone EXACTLY as shown in the reference photo - this is critical, not optional. Anyone who knows this " + identitySubject + " should immediately recognize them in the generated image.";
 
-    // Experiment B: extraLoraId is only ever set when the companion's trigger
-    // word is actually present in this prompt (see companionLoraIdForPrompt in
-    // app/skapa/page.tsx), so its absence combined with no multi-person
-    // keywords means this specific scene depicts the main character alone -
-    // the only case where a higher lora_scale carries no leakage risk to
-    // other people in frame.
-    const soloSceneBoostApplied = !extraLoraId && !hasMultiplePeople && !hasSecondaryPerson;
+    const finalPrompt = identityLock + " " +
+      "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " +
+      style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + style.styleConsistency +
+      ". Avoid: " + style.negative + ", wrong outfit, different clothes, clone, duplicate face, cloned face, same face repeated on multiple people, identical twins in background, multiple people with same appearance.";
 
-    // Experiment H: a smaller, deliberately more cautious boost for scenes
-    // that DO have crowd/group/secondary-person keywords (i.e. exactly the
-    // scenes experiment B/F correctly deny the larger solo boost to) - a
-    // conscious tradeoff of somewhat higher leakage risk for hopefully better
-    // main-character likeness. Only triggered by detected crowd/secondary-
-    // person text, not merely by extraLoraId being set with no such keywords
-    // (a companion referenced only by trigger word keeps the plain base
-    // value - untouched, most conservative). Separate from experiment B's
-    // fields entirely, so it can be rolled back independently.
-    const crowdSceneMinorBoostApplied = !soloSceneBoostApplied && (hasMultiplePeople || hasSecondaryPerson);
+    console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | Prompt: " + finalPrompt);
 
-    const activeLoraScale = soloSceneBoostApplied
-      ? (isChild ? style.loraScaleSoloChild : style.loraScaleSolo)
-      : crowdSceneMinorBoostApplied
-        ? (isChild ? style.loraScaleCrowdChild : style.loraScaleCrowd)
-        : (isChild ? style.loraScaleChild : style.loraScale);
+    const referenceImageBase64 = await fetchReferenceImageAsBase64(referenceImageUrl);
 
-    console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | secondaryPersonKeywords matched: " + hasSecondaryPerson + " (" + JSON.stringify(secondaryPersonMatches) + ")" + " | Tested against: " + cleanedPrompt + " | soloSceneBoostApplied: " + soloSceneBoostApplied + " | crowdSceneMinorBoostApplied: " + crowdSceneMinorBoostApplied + " | lora_scale used: " + activeLoraScale + " | Prompt: " + finalPrompt);
+    const geminiRes = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': GEMINI_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: finalPrompt },
+            { inline_data: { mime_type: 'image/jpeg', data: referenceImageBase64 } },
+          ],
+        }],
+        generationConfig: {
+          imageConfig: { aspectRatio: GEMINI_ASPECT_RATIO },
+        },
+      }),
+    });
 
-    const input: any = {
-      prompt: finalPrompt,
-      negative_prompt: style.negative + ", wrong outfit, different clothes, clone, duplicate face, cloned face, same face repeated on multiple people, identical twins in background, multiple people with same appearance",
-      width: 1024,
-      height: 1152,
-      num_inference_steps: 35,
-      guidance_scale: 3.5,
-      lora_scale: activeLoraScale
-    };
-
-    if (extraLoraId) {
-      input.extra_lora = extraLoraId;
-      input.extra_lora_scale = extraLoraScale || 0.8;
-    }
-
-    if (typeof seed === 'number') {
-      input.seed = seed;
-    }
-
-    const output = await replicate.run(trainedModelId, { input });
-    const finalImageUrl = Array.isArray(output) && output.length > 0 ? output[0] : null;
-
-    if (!finalImageUrl) {
+    const rawBody = await geminiRes.text();
+    if (!geminiRes.ok) {
+      console.error('Gemini API error (HTTP ' + geminiRes.status + '): ' + rawBody);
       return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
     }
 
-    return NextResponse.json({ imageUrl: finalImageUrl });
+    const data = JSON.parse(rawBody);
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const imagePart = parts.find((p: any) => p.inlineData || p.inline_data);
+    const inline = imagePart && (imagePart.inlineData || imagePart.inline_data);
+
+    if (!inline?.data) {
+      console.error('Gemini response had no image data: ' + rawBody);
+      return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
+    }
+
+    // No hosted URL comes back from Gemini (unlike Replicate) - the app never
+    // persisted generated page/cover images anywhere itself (generatedImages/
+    // coverImageUrl are plain in-memory React state, used directly as <img
+    // src> and for window.print()), so a data: URL is a drop-in replacement
+    // with the same session-only lifetime the Replicate CDN URLs already had.
+    const mimeType = inline.mimeType || inline.mime_type || 'image/png';
+    const imageUrl = 'data:' + mimeType + ';base64,' + inline.data;
+
+    return NextResponse.json({ imageUrl });
 
   } catch (error) {
     console.error('Image generation error:', error);

@@ -48,7 +48,7 @@ const FAL_KEY = process.env.FAL_KEY;
 // Replicate's training output (training.output.weights), NOT the
 // "owner/model:version" string used elsewhere in this app for Replicate's
 // own replicate.run() - see the open question above for why.
-const loraWeightsUrl = 'REPLACE_WITH_LORA_WEIGHTS_URL';
+const loraWeightsUrl = 'https://replicate.delivery/xezq/1XGMqkf1tnzUQSdLR54GvkBkTaUMW6erLWhEge9Qf05pXPdbB/trained_model.tar';
 // Bobban's actual reference photo URL, for the IP-Adapter FaceID input.
 // Find it via Supabase: `select reference_image_url from user_models where
 // trigger_word = 'BOBBANTOK';` - or open the character picker in the app

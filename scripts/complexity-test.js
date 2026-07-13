@@ -19,6 +19,14 @@
 // Boost only for non-cover panels, etc.) - not a simplified reinterpretation.
 // If route.ts's prompt logic changes later, this copy will drift out of
 // sync - acceptable for a one-off diagnostic script.
+//
+// UPDATE: after the first run of this script, generate-image/route.ts was
+// changed to add a panel-only facialDetailRequirement instruction (face
+// must stay readable even in wide/full-body shots) - this script's prompt
+// construction was updated to match, and VARIANTS below now outputs
+// test-facefix-*.jpg for base/pose/crowd/both, to compare directly against
+// the original test-complexity-*.jpg results. Cover excluded from this
+// re-run since the fix is panel-only and cover was already confirmed fine.
 
 const fs = require('fs');
 const https = require('https');
@@ -68,6 +76,11 @@ const identityReinforcement = isChild
   : ", character's exact facial features, bone structure and apparent age preserved from reference photos, do not age down or age up";
 const panelCompositionBoost = ", layered scene composition with atmospheric depth, high contrast dramatic staging";
 
+// Added to generate-image/route.ts after this very script isolated pose/
+// crowd/wide-shot scenes as the driver of poor identity likeness - panel
+// only, mirrors the production change exactly.
+const facialDetailRequirement = " FACIAL DETAIL REQUIREMENT (CRITICAL, NOT OPTIONAL): Even in full-body or wide-shot compositions, the character's face must remain clearly large enough to show identity-defining detail - do not render the face as a small, distant, or blurred detail. If the composition is a full-body or wide shot, ensure the framing keeps the face at a readable size, cropping closer if needed rather than shrinking the face into an indistinct feature.";
+
 const identitySubject = CHAR_DESC || 'person';
 const identityLock = "IDENTITY LOCK (CRITICAL, NOT OPTIONAL): This must be 100% recognizable as the exact same " + identitySubject + " shown in the reference photos. Preserve all facial features, face shape, eye color, hair color and texture, and skin tone EXACTLY as shown in the reference photos - this is critical, not optional. Anyone who knows this " + identitySubject + " should immediately recognize them in the generated image. IMPORTANT: The reference photos are provided SOLELY to establish facial identity, face shape, and skin tone - completely IGNORE any clothing visible in the reference photos. The character's outfit in the generated image must strictly follow the outfit description below, regardless of what they happen to be wearing in the reference photos.";
 
@@ -87,7 +100,7 @@ function buildFinalPrompt(sceneText, isCover) {
 
   const prompt = identityLock + " " +
     "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " +
-    STYLE.positive + ". Scene: " + sceneText + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + STYLE.styleConsistency +
+    STYLE.positive + ". Scene: " + sceneText + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost + facialDetailRequirement) + STYLE.styleConsistency +
     ". Avoid: " + STYLE.negative + ", wrong outfit, different clothes, clone, duplicate face, cloned face, same face repeated on multiple people, identical twins in background, multiple people with same appearance.";
 
   return { prompt, hasMultiplePeople, multiPersonMatches, sceneHasIntenseLighting };
@@ -98,18 +111,16 @@ function buildFinalPrompt(sceneText, isCover) {
 const BASE_SCENE = 'sitting on the grass, calmly tying his shoelaces before the match, focused expression';
 const TRIUMPH_POSE = 'standing on the football pitch, arms raised in a triumphant victorious pose after winning the match, big excited smile';
 
-// Reuses the cover's own composition framing (from buildCoverPrompt in
-// app/skapa/page.tsx) around the SAME neutral base scene/pose - isolates the
-// composition-instruction variable specifically, rather than also pulling
-// in a real book's title/memory text, which would conflate two variables.
-const COVER_COMPOSITION_SCENE = 'waist-up close-up portrait composition with the character large and close in the foreground, ' + BASE_SCENE + ', the character\'s entire head and hair fully visible with generous headroom above, never cropped at the top of frame';
-
+// Re-run after adding facialDetailRequirement to generate-image/route.ts -
+// filenames changed to test-facefix-* so these can sit alongside the
+// original test-complexity-*.jpg files for direct before/after comparison.
+// Cover intentionally excluded from this re-run: facialDetailRequirement is
+// panel-only, and the cover variant was already confirmed unaffected.
 const VARIANTS = [
-  { label: 'base', filename: 'test-complexity-base.jpg', sceneText: BASE_SCENE, isCover: false },
-  { label: 'pose', filename: 'test-complexity-pose.jpg', sceneText: TRIUMPH_POSE, isCover: false },
-  { label: 'crowd', filename: 'test-complexity-crowd.jpg', sceneText: BASE_SCENE + ', teammates and spectators visible in the background', isCover: false },
-  { label: 'both', filename: 'test-complexity-both.jpg', sceneText: TRIUMPH_POSE + ', teammates and cheering spectators celebrating around him in the background', isCover: false },
-  { label: 'cover', filename: 'test-complexity-cover.jpg', sceneText: COVER_COMPOSITION_SCENE, isCover: true },
+  { label: 'base', filename: 'test-facefix-base.jpg', sceneText: BASE_SCENE, isCover: false },
+  { label: 'pose', filename: 'test-facefix-pose.jpg', sceneText: TRIUMPH_POSE, isCover: false },
+  { label: 'crowd', filename: 'test-facefix-crowd.jpg', sceneText: BASE_SCENE + ', teammates and spectators visible in the background', isCover: false },
+  { label: 'both', filename: 'test-facefix-both.jpg', sceneText: TRIUMPH_POSE + ', teammates and cheering spectators celebrating around him in the background', isCover: false },
 ];
 
 function fetchAsBase64(url) {

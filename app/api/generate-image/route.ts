@@ -169,6 +169,16 @@ export async function POST(request: Request) {
     // contributes to avoid repeating the same phrase twice in one prompt.
     const panelCompositionBoost = ", layered scene composition with atmospheric depth, high contrast dramatic staging";
 
+    // Added after scripts/complexity-test.js isolated pose/crowd/wide-shot
+    // scenes as the driver of poor identity likeness in a real book's panels
+    // (cover composition was NOT affected - it already keeps the face large
+    // by design, via its own "waist-up close-up... large and close in the
+    // foreground" framing, so this is deliberately panel-only). Full-body or
+    // wide-shot panels were letting the face shrink to a small, indistinct
+    // detail even with 8 reference photos and IDENTITY LOCK - this tells
+    // Gemini to keep the face readable regardless of how wide the shot is.
+    const facialDetailRequirement = " FACIAL DETAIL REQUIREMENT (CRITICAL, NOT OPTIONAL): Even in full-body or wide-shot compositions, the character's face must remain clearly large enough to show identity-defining detail - do not render the face as a small, distant, or blurred detail. If the composition is a full-body or wide shot, ensure the framing keeps the face at a readable size, cropping closer if needed rather than shrinking the face into an indistinct feature.";
+
     // Read-only diagnostic for the "medium close-up shot" vs "waist-up...
     // medium shot" framing observation - no behavior change. Gemini picks
     // this phrase freely per panel from CAMERA FRAMING RULE's menu in
@@ -211,7 +221,7 @@ export async function POST(request: Request) {
 
     const finalPrompt = identityLock + " " +
       "Full unobstructed view of character's entire head and hair, vertical portrait framing, ample headroom, character never cropped at top of frame. " +
-      style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost) + style.styleConsistency + companionClause +
+      style.positive + ". Scene: " + cleanedPrompt + ". The character must wear exactly: " + finalOutfit + " in this scene, outfit must not change, protagonist's full head and hair must remain fully visible even in crowd or group scenes, do not crop the main character's head to fit background characters" + identityReinforcement + backgroundDiversity + qualityBoost + (isCover ? "" : panelCompositionBoost + facialDetailRequirement) + style.styleConsistency + companionClause +
       ". Avoid: " + style.negative + ", wrong outfit, different clothes, clone, duplicate face, cloned face, same face repeated on multiple people, identical twins in background, multiple people with same appearance.";
 
     console.log("Style: " + styleKey + " | isCover: " + !!isCover + " | Intense lighting detected: " + sceneHasIntenseLighting + " | multiPersonKeywords matched: " + hasMultiplePeople + " (" + JSON.stringify(multiPersonMatches) + ")" + " | companion reference image included: " + !!companionReferenceImageUrl + " | Prompt: " + finalPrompt);
